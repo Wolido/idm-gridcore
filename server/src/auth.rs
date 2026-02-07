@@ -4,7 +4,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use std::sync::Arc;
+
 
 use crate::AppState;
 

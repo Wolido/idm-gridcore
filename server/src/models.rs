@@ -70,6 +70,10 @@ pub struct Node {
     pub cpu_count: u32,
     pub last_seen: DateTime<Utc>,
     pub status: NodeStatus,
+    /// 运行时状态：Running/Idle/Error
+    pub runtime_status: Option<NodeRuntimeStatus>,
+    /// 活跃容器数量
+    pub active_containers: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,11 +199,28 @@ impl AppStateInner {
         self.nodes.insert(node.id.clone(), node);
     }
 
-    /// 更新节点心跳
-    pub fn update_heartbeat(&mut self, node_id: &str) -> bool {
+    /// 更新节点心跳（带运行时状态）
+    pub fn update_heartbeat(
+        &mut self,
+        node_id: &str,
+        runtime_status: NodeRuntimeStatus,
+        active_containers: u32,
+    ) -> bool {
         if let Some(node) = self.nodes.get_mut(node_id) {
             node.last_seen = Utc::now();
             node.status = NodeStatus::Online;
+            node.runtime_status = Some(runtime_status);
+            node.active_containers = active_containers;
+
+            // 记录错误状态日志
+            if matches!(runtime_status, NodeRuntimeStatus::Error) {
+                tracing::warn!(
+                    "Node {} reported error status (active containers: {})",
+                    node_id,
+                    active_containers
+                );
+            }
+
             true
         } else {
             false

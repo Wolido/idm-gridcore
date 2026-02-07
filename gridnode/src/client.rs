@@ -1,4 +1,4 @@
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 /// ComputeHub 客户端（GridNode 使用）

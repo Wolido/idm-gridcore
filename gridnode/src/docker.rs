@@ -249,6 +249,8 @@ impl DockerManager {
     }
 
     /// 拉取镜像（根据当前架构）
+    /// 返回: Ok(()) 表示镜像已准备好（拉取成功或已存在）
+    ///       Err 表示拉取失败（权限错误、镜像不存在等）
     pub async fn pull_image(&self, image: &str) -> anyhow::Result<()> {
         info!("Pulling image: {} for platform: {}", image, self.platform);
         
@@ -260,19 +262,87 @@ impl DockerManager {
 
         let mut stream = self.docker.create_image(Some(options), None, None);
         use futures::StreamExt;
+        
+        let mut has_error = false;
+        let mut error_msg = String::new();
 
         while let Some(result) = stream.next().await {
             match result {
                 Ok(_) => {}
                 Err(e) => {
-                    warn!("Error pulling image: {}", e);
-                    // 不返回错误，因为镜像可能已存在
+                    let msg = e.to_string();
+                    // 镜像已存在不是错误
+                    if msg.contains("not found") || msg.contains("pull access denied") {
+                        has_error = true;
+                        error_msg = msg;
+                    } else if msg.contains("permission denied") {
+                        has_error = true;
+                        error_msg = msg;
+                    } else {
+                        // 其他错误可能是网络问题，记录下来但继续尝试
+                        warn!("Non-fatal error pulling image: {}", msg);
+                    }
                 }
             }
         }
 
+        // 如果有致命错误，返回错误
+        if has_error {
+            return Err(anyhow::anyhow!("Failed to pull image '{}': {}", image, error_msg));
+        }
+
         info!("Image pull completed: {}", image);
         Ok(())
+    }
+
+    /// 停止容器
+    pub async fn stop_container(&self, container_id: &str) -> anyhow::Result<()> {
+        info!("Stopping container {}", container_id);
+        
+        use bollard::container::StopContainerOptions;
+        
+        let options = StopContainerOptions {
+            t: 10, // 10秒优雅停止超时
+        };
+        
+        match self.docker.stop_container(container_id, Some(options)).await {
+            Ok(_) => {
+                info!("Container {} stopped successfully", container_id);
+                Ok(())
+            }
+            Err(e) => {
+                // 容器可能已经不存在的错误可以忽略
+                let msg = e.to_string();
+                if msg.contains("No such container") || msg.contains("not found") {
+                    info!("Container {} already stopped or removed", container_id);
+                    Ok(())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
+    }
+
+    /// 删除容器
+    pub async fn remove_container(&self, container_id: &str) -> anyhow::Result<()> {
+        use bollard::container::RemoveContainerOptions;
+        
+        let options = RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+        };
+        
+        match self.docker.remove_container(container_id, Some(options)).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("No such container") || msg.contains("not found") {
+                    Ok(())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
     }
 
     /// 清理已停止的容器

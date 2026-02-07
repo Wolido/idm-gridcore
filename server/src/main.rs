@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 const CONFIG_PATH: &str = "/etc/idm-gridcore/computehub.toml";
 const CONFIG_DIR: &str = "/etc/idm-gridcore";
@@ -201,6 +201,8 @@ async fn register_node(
         cpu_count: req.cpu_count,
         last_seen: chrono::Utc::now(),
         status: NodeStatus::Online,
+        runtime_status: None,
+        active_containers: 0,
     };
 
     let mut state = state.write().await;
@@ -235,7 +237,7 @@ async fn register_node(
 async fn heartbeat(State(state): State<AppState>, Json(req): Json<HeartbeatRequest>) -> StatusCode {
     let mut state = state.write().await;
 
-    if state.update_heartbeat(&req.node_id) {
+    if state.update_heartbeat(&req.node_id, req.status, req.active_containers) {
         StatusCode::OK
     } else {
         warn!("Heartbeat from unknown node: {}", req.node_id);
