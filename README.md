@@ -91,8 +91,8 @@ token = "your-secret-token"
 
 ### 4. 注册计算任务
 
+**单镜像（所有架构通用）**:
 ```bash
-# 使用 curl 注册任务
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-secret-token" \
@@ -105,6 +105,31 @@ curl -X POST http://localhost:8080/api/tasks \
     "output_queue": "hea:output"
   }'
 ```
+
+**多架构镜像（推荐）**:  
+如果镜像支持多架构，直接提供主镜像名即可。  
+如果不同架构使用不同镜像标签，使用 `images` 映射：
+
+```bash
+curl -X POST http://localhost:8080/api/tasks \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
+  -d '{
+    "name": "hea-calc",
+    "images": {
+      "linux/amd64": "your-registry/hea-calc:v1.0-amd64",
+      "linux/arm64": "your-registry/hea-calc:v1.0-arm64"
+    },
+    "input_redis": "redis://:password@redis-host:6379",
+    "input_queue": "hea:input",
+    "output_queue": "hea:output"
+  }'
+```
+
+支持的架构：
+- `linux/amd64` - x86_64 (Intel/AMD)
+- `linux/arm64` - ARM64 (树莓派 4, Apple Silicon, 云服务器)
+- `linux/arm/v7` - ARM32 (旧树莓派)
 
 ### 5. 启动计算节点
 

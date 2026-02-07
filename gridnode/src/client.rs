@@ -7,6 +7,7 @@ pub struct ComputeHubClient {
     client: Client,
     base_url: String,
     token: String,
+    platform: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -49,11 +50,12 @@ pub enum NodeRuntimeStatus {
 }
 
 impl ComputeHubClient {
-    pub fn new(base_url: String, token: String) -> Self {
+    pub fn new(base_url: String, token: String, platform: String) -> Self {
         Self {
             client: Client::new(),
             base_url,
             token,
+            platform,
         }
     }
 
@@ -122,7 +124,7 @@ impl ComputeHubClient {
 
     /// 获取当前任务
     pub async fn get_task(&self) -> anyhow::Result<Option<TaskConfig>> {
-        let url = format!("{}/gridnode/task", self.base_url);
+        let url = format!("{}/gridnode/task?platform={}", self.base_url, self.platform);
 
         let resp = self
             .client

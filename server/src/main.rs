@@ -193,18 +193,29 @@ async fn register_node(
         status: NodeStatus::Online,
     };
 
+    // 根据架构确定平台
+    let platform = match req.architecture.as_str() {
+        "x86_64" => "linux/amd64",
+        "aarch64" => "linux/arm64",
+        "arm" => "linux/arm/v7",
+        _ => "linux/amd64", // 默认
+    };
+
     let mut state = state.write().await;
     state.register_node(node);
 
-    // 返回当前任务配置
-    let current_task = state.get_current_task().map(|task| TaskConfig {
-        task_name: task.name.clone(),
-        image: task.image.clone(),
-        redis_url: None,
-        input_redis: task.input_redis.clone(),
-        output_redis: task.output_redis.clone(),
-        input_queue: task.input_queue.clone(),
-        output_queue: task.output_queue.clone(),
+    // 返回当前任务配置（根据节点架构选择镜像）
+    let current_task = state.get_current_task().and_then(|task| {
+        let image = task.get_image_for_platform(platform)?;
+        Some(TaskConfig {
+            task_name: task.name.clone(),
+            image,
+            redis_url: None,
+            input_redis: task.input_redis.clone(),
+            output_redis: task.output_redis.clone(),
+            input_queue: task.input_queue.clone(),
+            output_queue: task.output_queue.clone(),
+        })
     });
 
     info!(
@@ -231,17 +242,26 @@ async fn heartbeat(State(state): State<AppState>, Json(req): Json<HeartbeatReque
 }
 
 /// 获取当前任务（非阻塞）
-async fn get_current_task(State(state): State<AppState>) -> Json<Option<TaskConfig>> {
+/// 查询参数 platform: 如 linux/amd64, linux/arm64
+async fn get_current_task(
+    State(state): State<AppState>,
+    axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+) -> Json<Option<TaskConfig>> {
     let state = state.read().await;
 
-    let config = state.get_current_task().map(|task| TaskConfig {
-        task_name: task.name.clone(),
-        image: task.image.clone(),
-        redis_url: None,
-        input_redis: task.input_redis.clone(),
-        output_redis: task.output_redis.clone(),
-        input_queue: task.input_queue.clone(),
-        output_queue: task.output_queue.clone(),
+    let platform = params.get("platform").map(|s| s.as_str()).unwrap_or("linux/amd64");
+
+    let config = state.get_current_task().and_then(|task| {
+        let image = task.get_image_for_platform(platform)?;
+        Some(TaskConfig {
+            task_name: task.name.clone(),
+            image,
+            redis_url: None,
+            input_redis: task.input_redis.clone(),
+            output_redis: task.output_redis.clone(),
+            input_queue: task.input_queue.clone(),
+            output_queue: task.output_queue.clone(),
+        })
     });
 
     Json(config)

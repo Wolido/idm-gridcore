@@ -39,8 +39,17 @@ async fn main() -> anyhow::Result<()> {
     // 从配置文件读取 node_id（如果有的话）
     let existing_node_id = config.node_id.clone();
 
+    // 根据架构确定 Docker platform
+    let platform = match config.architecture.as_str() {
+        "x86_64" => "linux/amd64",
+        "aarch64" => "linux/arm64",
+        "arm" => "linux/arm/v7",
+        _ => "linux/amd64",
+    };
+    info!("Detected platform: {}", platform);
+
     // 创建客户端
-    let client = ComputeHubClient::new(config.server_url.clone(), config.token.clone());
+    let client = ComputeHubClient::new(config.server_url.clone(), config.token.clone(), platform.to_string());
 
     // 注册节点（不传 node_id，让 ComputeHub 分配）
     let parallelism = config.get_parallelism();

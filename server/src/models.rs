@@ -5,11 +5,22 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
 
-/// 任务定义
+/// 任务定义（支持多架构镜像）
+/// 方式1: 单镜像（默认架构）
+///   image: "myapp:latest"
+/// 
+/// 方式2: 多架构镜像映射
+///   images: {
+///     "linux/amd64": "myapp:latest-amd64",
+///     "linux/arm64": "myapp:latest-arm64"
+///   }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub name: String,
-    pub image: String,
+    /// 单镜像（向后兼容，所有架构使用同一镜像）
+    pub image: Option<String>,
+    /// 多架构镜像映射
+    pub images: Option<HashMap<String, String>>,
     /// 可选：覆盖 Redis 输入连接
     pub input_redis: Option<String>,
     /// 可选：覆盖 Redis 输出连接（默认与输入相同）
@@ -18,6 +29,20 @@ pub struct Task {
     pub input_queue: Option<String>,
     /// 可选：覆盖输出队列名
     pub output_queue: Option<String>,
+}
+
+impl Task {
+    /// 获取指定平台的镜像
+    pub fn get_image_for_platform(&self, platform: &str) -> Option<String> {
+        // 首先尝试从 images 映射中获取
+        if let Some(ref images) = self.images {
+            if let Some(image) = images.get(platform) {
+                return Some(image.clone());
+            }
+        }
+        // 回退到默认 image
+        self.image.clone()
+    }
 }
 
 /// 任务状态（内部使用）
