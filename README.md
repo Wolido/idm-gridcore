@@ -31,8 +31,8 @@ IDM-GridCore 是一个专为大规模并行计算设计的轻量级调度框架�
 **数据流**: 用户任务 → Redis 输入队列 → 计算节点池 → Redis 输出队列
 
 **角色分工**:
-- **ComputeHub**: 管理任务队列、协调计算节点、监控运行状态
-- **GridNode**: 部署在各计算节点，拉取镜像、启动容器、上报心跳
+- **ComputeHub** (computehub): 管理任务队列、协调计算节点、监控运行状态
+- **GridNode** (gridnode): 部署在各计算节点，拉取镜像、启动容器、上报心跳
 - **Redis**: 任务队列存储，输入输出分离
 - **Docker**: 实际执行计算任务，每个容器单 CPU 运行
 
@@ -58,7 +58,7 @@ IDM-GridCore 是一个专为大规模并行计算设计的轻量级调度框架�
 ### 1. 启动 ComputeHub 服务端
 
 ```bash
-cd server
+cd computehub
 cargo run --release
 # 默认监听 0.0.0.0:8080
 ```
