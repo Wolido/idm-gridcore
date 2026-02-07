@@ -15,15 +15,28 @@ impl DockerManager {
         match Docker::connect_with_local_defaults() {
             Ok(docker) => Ok(Self { docker }),
             Err(e) => {
-                eprintln!("\n❌ Docker 连接失败！");
-                eprintln!("\n请确保 Docker 已安装并正在运行：");
-                eprintln!("  1. 安装 Docker: https://docs.docker.com/get-docker/");
-                eprintln!("  2. 启动 Docker 服务:");
-                eprintln!("     sudo systemctl start docker");
-                eprintln!("  3. 将当前用户加入 docker 组（可选，避免 sudo）:");
-                eprintln!("     sudo usermod -aG docker $USER");
-                eprintln!("     # 然后重新登录或执行: newgrp docker");
-                eprintln!("\n错误详情: {}\n", e);
+                let err_msg = e.to_string();
+                
+                // 检查是否是权限问题
+                if err_msg.contains("permission denied") || err_msg.contains("connect") {
+                    eprintln!("\n❌ Docker 连接失败：权限不足！");
+                    eprintln!("\n当前用户没有 Docker 访问权限。解决方案：");
+                    eprintln!("\n方案 1 - 将用户加入 docker 组（推荐）：");
+                    eprintln!("   sudo usermod -aG docker $USER");
+                    eprintln!("   newgrp docker  # 立即生效，或重新登录");
+                    eprintln!("\n方案 2 - 使用 sudo 运行（临时）：");
+                    eprintln!("   sudo ./gridnode");
+                    eprintln!("\n方案 3 - 检查 Docker 服务是否运行：");
+                    eprintln!("   sudo systemctl status docker");
+                    eprintln!("   sudo systemctl start docker");
+                } else {
+                    eprintln!("\n❌ Docker 连接失败！");
+                    eprintln!("\n请确保 Docker 已安装并正在运行：");
+                    eprintln!("  1. 安装 Docker: https://docs.docker.com/get-docker/");
+                    eprintln!("  2. 启动 Docker 服务:");
+                    eprintln!("     sudo systemctl start docker");
+                    eprintln!("\n错误详情: {}", err_msg);
+                }
                 Err(anyhow::anyhow!("Docker not available"))
             }
         }
