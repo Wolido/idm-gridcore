@@ -72,15 +72,30 @@ cargo build --release
 # 首次运行生成配置文件
 sudo mkdir -p /etc/idm-gridcore
 sudo ./target/release/gridnode
-# 编辑 /etc/idm-gridcore/gridnode.toml 配置服务端地址
+# 编辑 /etc/idm-gridcore/gridnode.toml 配置服务端地址和 token
 ```
 
-### 3. 注册计算任务
+### 3. 配置认证 Token
+
+ComputeHub 和 GridNode 必须使用相同的 token 进行认证。
+
+**ComputeHub** (`/etc/idm-gridcore/computehub.toml`):
+```toml
+token = "your-secret-token"
+```
+
+**GridNode** (`/etc/idm-gridcore/gridnode.toml`):
+```toml
+token = "your-secret-token"
+```
+
+### 4. 注册计算任务
 
 ```bash
 # 使用 curl 注册任务
 curl -X POST http://localhost:8080/api/tasks \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-token" \
   -d '{
     "name": "hea-calc",
     "image": "your-registry/hea-calc:v1.0",
@@ -91,7 +106,7 @@ curl -X POST http://localhost:8080/api/tasks \
   }'
 ```
 
-### 4. 启动计算节点
+### 5. 启动计算节点
 
 ```bash
 sudo ./target/release/gridnode
@@ -103,7 +118,7 @@ GridNode 会自动：
 - 每个容器从 Redis 取任务计算
 - 定期发送心跳
 
-### 5. 人工切换任务
+### 6. 人工切换任务
 
 当第一个任务的 Redis 队列空了（人工确认）：
 
@@ -114,6 +129,13 @@ curl -X POST http://localhost:8080/api/tasks/next
 所有计算节点会自动切换到下一个任务。
 
 ## API 文档
+
+### 认证
+
+除 `/health` 外，所有 API 都需要在请求头中携带 Token：
+```
+Authorization: Bearer <your-token>
+```
 
 ### 用户 API
 
@@ -156,7 +178,7 @@ curl -X POST http://localhost:8080/api/tasks/next
 # ComputeHub 服务端地址
 server_url = "http://192.168.1.100:8080"
 
-# 节点认证 Token
+# 节点认证 Token（必须与 ComputeHub 配置的 token 相同）
 token = "your-secret-token"
 
 # 节点唯一 ID（首次启动由 ComputeHub 分配，自动保存）
