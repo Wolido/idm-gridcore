@@ -12,34 +12,126 @@ pub struct DockerManager {
 
 impl DockerManager {
     pub fn new() -> anyhow::Result<Self> {
+        // 尝试连接 Docker
+        Self::connect_docker()
+    }
+
+    fn connect_docker() -> anyhow::Result<Self> {
+        // 首先尝试标准连接（Linux socket 或 Windows named pipe）
         match Docker::connect_with_local_defaults() {
-            Ok(docker) => Ok(Self { docker }),
+            Ok(docker) => {
+                info!("Connected to Docker");
+                return Ok(Self { docker });
+            }
             Err(e) => {
                 let err_msg = e.to_string();
                 
                 // 检查是否是权限问题
-                if err_msg.contains("permission denied") || err_msg.contains("connect") {
-                    eprintln!("\n❌ Docker 连接失败：权限不足！");
-                    eprintln!("\n当前用户没有 Docker 访问权限。解决方案：");
-                    eprintln!("\n方案 1 - 将用户加入 docker 组（推荐）：");
-                    eprintln!("   sudo usermod -aG docker $USER");
-                    eprintln!("   newgrp docker  # 立即生效，或重新登录");
-                    eprintln!("\n方案 2 - 使用 sudo 运行（临时）：");
-                    eprintln!("   sudo ./gridnode");
-                    eprintln!("\n方案 3 - 检查 Docker 服务是否运行：");
-                    eprintln!("   sudo systemctl status docker");
-                    eprintln!("   sudo systemctl start docker");
-                } else {
-                    eprintln!("\n❌ Docker 连接失败！");
-                    eprintln!("\n请确保 Docker 已安装并正在运行：");
-                    eprintln!("  1. 安装 Docker: https://docs.docker.com/get-docker/");
-                    eprintln!("  2. 启动 Docker 服务:");
-                    eprintln!("     sudo systemctl start docker");
-                    eprintln!("\n错误详情: {}", err_msg);
+                if err_msg.contains("permission denied") {
+                    return Err(Self::permission_error(&err_msg));
                 }
-                Err(anyhow::anyhow!("Docker not available"))
+                
+                // Linux/macOS: 尝试显式连接 unix socket
+                #[cfg(unix)]
+                {
+                    match Docker::connect_with_unix(
+                        "/var/run/docker.sock",
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    ) {
+                        Ok(docker) => {
+                            info!("Connected to Docker via unix socket");
+                            return Ok(Self { docker });
+                        }
+                        Err(e2) => {
+                            if e2.to_string().contains("permission denied") {
+                                return Err(Self::permission_error(&e2.to_string()));
+                            }
+                        }
+                    }
+                }
+                
+                // macOS: 尝试 Docker Desktop socket 路径
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME").unwrap_or_default();
+                    let macos_paths = [
+                        format!("{}/.docker/run/docker.sock", home),
+                        "/var/run/docker.sock".to_string(),
+                    ];
+                    
+                    for path in &macos_paths {
+                        if std::path::Path::new(path).exists() {
+                            match Docker::connect_with_unix(
+                                path,
+                                120,
+                                bollard::API_DEFAULT_VERSION,
+                            ) {
+                                Ok(docker) => {
+                                    info!("Connected to Docker via {}", path);
+                                    return Ok(Self { docker });
+                                }
+                                Err(_) => continue,
+                            }
+                        }
+                    }
+                }
+                
+                return Err(Self::connection_error(&e.to_string()));
             }
         }
+    }
+
+    fn permission_error(err_msg: &str) -> anyhow::Error {
+        eprintln!("\n❌ Docker 连接失败：权限不足！");
+        eprintln!("\n当前用户没有 Docker 访问权限。解决方案：");
+        
+        #[cfg(target_os = "linux")]
+        {
+            eprintln!("\n方案 1 - 将用户加入 docker 组（推荐）：");
+            eprintln!("   sudo usermod -aG docker $USER");
+            eprintln!("   newgrp docker  # 立即生效，或重新登录");
+            eprintln!("\n方案 2 - 使用 sudo 运行（临时）：");
+            eprintln!("   sudo ./gridnode");
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            eprintln!("\n方案 1 - 检查 Docker Desktop 是否运行：");
+            eprintln!("   open -a Docker");
+            eprintln!("\n方案 2 - 检查 socket 权限：");
+            eprintln!("   ls -la ~/.docker/run/docker.sock");
+        }
+        
+        eprintln!("\n方案 3 - 检查 Docker 服务是否运行：");
+        eprintln!("   sudo systemctl status docker  # Linux");
+        eprintln!("   # macOS: 检查 Docker Desktop 状态栏图标");
+        
+        anyhow::anyhow!("Docker permission denied: {}", err_msg)
+    }
+
+    fn connection_error(err_msg: &str) -> anyhow::Error {
+        eprintln!("\n❌ Docker 连接失败！");
+        eprintln!("\n请确保 Docker 已安装并正在运行：");
+        
+        #[cfg(target_os = "linux")]
+        {
+            eprintln!("\nLinux 安装指南：");
+            eprintln!("  1. 安装 Docker: https://docs.docker.com/engine/install/");
+            eprintln!("  2. 启动服务: sudo systemctl start docker");
+            eprintln!("  3. 设置开机启动: sudo systemctl enable docker");
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            eprintln!("\nmacOS 安装指南：");
+            eprintln!("  1. 安装 Docker Desktop: https://www.docker.com/products/docker-desktop/");
+            eprintln!("  2. 启动 Docker Desktop 应用");
+            eprintln!("  3. 等待状态栏图标显示 Docker 正在运行");
+        }
+        
+        eprintln!("\n错误详情: {}", err_msg);
+        anyhow::anyhow!("Docker not available")
     }
 
     /// 启动计算容器
