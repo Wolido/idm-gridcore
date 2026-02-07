@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// Agent 配置文件
+/// GridNode 配置文件
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AgentConfig {
+pub struct GridNodeConfig {
     /// ComputeHub 服务端地址
     pub server_url: String,
     /// 节点认证 Token
@@ -20,7 +20,7 @@ pub struct AgentConfig {
     pub heartbeat_interval: u64,
 }
 
-impl Default for AgentConfig {
+impl Default for GridNodeConfig {
     fn default() -> Self {
         Self {
             server_url: "http://localhost:8080".to_string(),
@@ -34,11 +34,11 @@ impl Default for AgentConfig {
     }
 }
 
-impl AgentConfig {
+impl GridNodeConfig {
     /// 从文件加载配置
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        let config: AgentConfig = toml::from_str(&content)?;
+        let config: GridNodeConfig = toml::from_str(&content)?;
         Ok(config)
     }
 
@@ -61,7 +61,7 @@ impl AgentConfig {
 
 /// 生成默认配置文件内容
 pub fn generate_default_config() -> String {
-    r#"# IDM-GridCore Agent Configuration
+    r#"# IDM-GridCore GridNode Configuration
 
 # ComputeHub 服务端地址
 server_url = "http://localhost:8080"

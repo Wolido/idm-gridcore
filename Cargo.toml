@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "agent"]
+members = ["server", "gridnode"]
 resolver = "2"
 
 [workspace.dependencies]

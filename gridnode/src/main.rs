@@ -3,7 +3,7 @@ mod config;
 mod docker;
 
 use crate::client::{ComputeHubClient, NodeRuntimeStatus, TaskConfig};
-use crate::config::AgentConfig;
+use crate::config::GridNodeConfig;
 use crate::docker::DockerManager;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tokio::time::{interval, sleep, Duration};
 use tracing::{error, info, warn};
 
-const CONFIG_PATH: &str = "/etc/idm-gridcore/agent.toml";
+const CONFIG_PATH: &str = "/etc/idm-gridcore/gridnode.toml";
 const CONFIG_DIR: &str = "/etc/idm-gridcore";
 
 #[tokio::main]
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 加载配置
-    let mut config = AgentConfig::from_file(&config_path)?;
+    let mut config = GridNodeConfig::from_file(&config_path)?;
     info!("Loaded config from {}", CONFIG_PATH);
 
     // 从配置文件读取 node_id（如果有的话）

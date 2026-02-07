@@ -48,9 +48,9 @@ async fn main() {
         .route("/api/tasks", post(create_task).get(list_tasks))
         .route("/api/tasks/next", post(next_task))
         .route("/api/nodes", get(list_nodes))
-        .route("/agent/register", post(register_node))
-        .route("/agent/heartbeat", post(heartbeat))
-        .route("/agent/task", get(get_current_task))
+        .route("/gridnode/register", post(register_node))
+        .route("/gridnode/heartbeat", post(heartbeat))
+        .route("/gridnode/task", get(get_current_task))
         .route("/health", get(health_check))
         .with_state(state);
 

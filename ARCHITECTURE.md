@@ -45,7 +45,7 @@ IDM-GridCore 是一个基于"众筹计算"理念的分布式并行计算框架�
 ┌───────────┼─────────────────────────────────────────────────┐
 │           ▼         计算层 (多节点)                            │
 │  ┌─────────────────┐                                        │
-│  │  Agent          │  - 注册到 ComputeHub                   │
+│  │  GridNode       │  - 注册到 ComputeHub                   │
 │  │  - 心跳维持      │  - 获取当前任务配置                     │
 │  │  - 容器管理      │  - 启动 N 个 Docker 容器               │
 │  └────────┬────────┘                                        │
@@ -68,7 +68,7 @@ IDM-GridCore 是一个基于"众筹计算"理念的分布式并行计算框架�
 ### 组件关系
 
 - **ComputeHub**: 唯一的状态管理中心
-- **Agent**: 无状态，重启后重新注册
+- **GridNode**: 无状态，重启后重新注册
 - **Redis**: 外部依赖，不存储在 ComputeHub
 - **Docker**: 实际计算执行者
 
@@ -83,7 +83,7 @@ IDM-GridCore 是一个基于"众筹计算"理念的分布式并行计算框架�
 | 职责 | 说明 |
 |------|------|
 | 任务队列管理 | 维护任务列表，记录当前执行位置 |
-| 节点注册管理 | 接受 Agent 注册，分配 node_id |
+| 节点注册管理 | 接受 GridNode 注册，分配 node_id |
 | 心跳监控 | 维护节点在线状态，清理超时节点 |
 | 任务配置分发 | 向 Agent 返回当前任务配置 |
 | 人工切换接口 | 接收切换指令，更新当前任务指针 |
@@ -146,17 +146,17 @@ Online ◄──► Offline (心跳超时 60s)
 - 更新 current_task_index
 - 返回切换结果
 
-**POST /agent/register** - 节点注册
+**POST /gridnode/register** - 节点注册
 - 如果请求中没有 node_id，ComputeHub 生成新的 UUID
 - 如果请求中有 node_id，使用 Agent 提供的 ID（用于重启恢复）
 - 保存节点信息到 nodes
 - 返回 node_id 和当前任务配置
 
-**POST /agent/heartbeat** - 心跳
+**POST /gridnode/heartbeat** - 心跳
 - 更新节点 last_seen
 - 节点状态设为 Online
 
-**GET /agent/task** - 获取任务配置
+**GET /gridnode/task** - 获取任务配置
 - 返回当前 Running 任务的配置
 - Agent 轮询此接口检测任务变化
 
@@ -170,7 +170,7 @@ loop {
 }
 ```
 
-### 2. Agent (计算节点)
+### 2. GridNode (计算节点)
 
 #### 职责
 
@@ -188,7 +188,7 @@ loop {
 启动
   │
   ▼
-读取配置文件 (/etc/idm-gridcore/agent.toml)
+读取配置文件 (/etc/idm-gridcore/gridnode.toml)
   │
   ▼
 注册到 ComputeHub
@@ -270,7 +270,7 @@ loop {
 
 #### 配置管理
 
-配置文件: `/etc/idm-gridcore/agent.toml`
+配置文件: `/etc/idm-gridcore/gridnode.toml`
 
 ```toml
 server_url = "http://192.168.1.100:8080"
@@ -412,7 +412,7 @@ while True:
 1. **简化**: 内存状态足够，SQLite 只作为未来扩展点
 2. **可恢复**: 任务队列可以从 Redis 重建（如果需要）
 3. **轻量**: 单二进制部署，无外部依赖
-4. **重启策略**: ComputeHub 重启后，节点自动重新注册
+4. **重启策略**: ComputeHub 重启后，GridNode 自动重新注册
 
 ### 状态恢复策略
 
@@ -424,7 +424,7 @@ while True:
 4. 用户重新调用 /api/tasks/next 开始任务
 ```
 
-**Agent 重启**:
+**GridNode 重启**:
 ```
 1. 读取配置文件（保存了 node_id）
 2. 重新注册到 ComputeHub
@@ -437,7 +437,7 @@ while True:
 
 ### 1. 节点故障
 
-**场景**: Agent 崩溃或网络断开
+**场景**: GridNode 崩溃或网络断开
 
 **处理**:
 - 心跳停止，ComputeHub 60s 后标记为 Offline
@@ -573,7 +573,7 @@ while True:
 **小规模（< 100 节点）**:
 - 1 台 ComputeHub（2核4G）
 - 1 台 Redis（4核8G）
-- 各计算节点运行 Agent
+- 各计算节点运行 GridNode
 
 **大规模（> 1000 节点）**:
 - ComputeHub 多实例 + 负载均衡

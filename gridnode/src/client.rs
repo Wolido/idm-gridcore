@@ -1,7 +1,7 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
-/// ComputeHub 客户端
+/// ComputeHub 客户端（GridNode 使用）
 #[derive(Clone)]
 pub struct ComputeHubClient {
     client: Client,
@@ -65,7 +65,7 @@ impl ComputeHubClient {
         architecture: String,
         cpu_count: u32,
     ) -> anyhow::Result<RegisterResponse> {
-        let url = format!("{}/agent/register", self.base_url);
+        let url = format!("{}/gridnode/register", self.base_url);
         let req = RegisterRequest {
             node_id,
             hostname,
@@ -102,7 +102,7 @@ impl ComputeHubClient {
         status: NodeRuntimeStatus,
         active_containers: u32,
     ) -> anyhow::Result<bool> {
-        let url = format!("{}/agent/heartbeat", self.base_url);
+        let url = format!("{}/gridnode/heartbeat", self.base_url);
         let req = HeartbeatRequest {
             node_id: node_id.to_string(),
             status,
@@ -122,7 +122,7 @@ impl ComputeHubClient {
 
     /// 获取当前任务
     pub async fn get_task(&self) -> anyhow::Result<Option<TaskConfig>> {
-        let url = format!("{}/agent/task", self.base_url);
+        let url = format!("{}/gridnode/task", self.base_url);
 
         let resp = self
             .client
