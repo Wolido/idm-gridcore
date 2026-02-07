@@ -1,31 +1,61 @@
+mod auth;
+mod config;
 mod models;
 
 use axum::{
-    extract::{Extension, State},
+    extract::State,
     http::StatusCode,
+    middleware,
     response::Json,
     routing::{get, post},
     Router,
 };
+use config::{generate_default_config, ServerConfig};
 use models::{
     AppState, AppStateInner, CreateTaskRequest, HeartbeatRequest, Node, NodeStatus,
-    RegisterNodeRequest, RegisterNodeResponse, Task, TaskConfig, TaskListResponse,
-    TaskWithStatus, TaskStatus,
+    RegisterNodeRequest, RegisterNodeResponse, Task, TaskConfig, TaskListResponse, TaskStatus,
 };
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
-use tracing::{info, warn};
-use chrono::Utc;
+use tracing::{error, info, warn};
+
+const CONFIG_PATH: &str = "/etc/idm-gridcore/computehub.toml";
+const CONFIG_DIR: &str = "/etc/idm-gridcore";
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // 初始化日志
     tracing_subscriber::fmt::init();
 
+    // 检查配置文件
+    let config_path = PathBuf::from(CONFIG_PATH);
+    if !config_path.exists() {
+        // 创建默认配置文件
+        std::fs::create_dir_all(CONFIG_DIR)?;
+        let default_config = generate_default_config();
+        std::fs::write(&config_path, default_config)?;
+        info!("Created default config at {}", CONFIG_PATH);
+        info!("Please edit the config file and set a secure token, then restart");
+        return Ok(());
+    }
+
+    // 加载配置
+    let server_config = ServerConfig::from_file(&config_path)?;
+    info!("Loaded config from {}", CONFIG_PATH);
+    info!("Bind address: {}", server_config.bind);
+
+    // 检查默认 token
+    if server_config.token == "change-me-in-production"
+        || server_config.token == "your-secret-token-change-this"
+    {
+        warn!("WARNING: Using default token! Please change it in the config file for security.");
+    }
+
     // 初始化状态
-    let state: AppState = Arc::new(RwLock::new(AppStateInner::new()));
+    let state: AppState = Arc::new(RwLock::new(AppStateInner::new(server_config.clone())));
 
     // 启动节点清理任务
     let cleanup_state = state.clone();
@@ -44,22 +74,28 @@ async fn main() {
     });
 
     // 构建路由
-    let app = Router::new()
+    let protected_routes = Router::new()
         .route("/api/tasks", post(create_task).get(list_tasks))
         .route("/api/tasks/next", post(next_task))
         .route("/api/nodes", get(list_nodes))
         .route("/gridnode/register", post(register_node))
         .route("/gridnode/heartbeat", post(heartbeat))
         .route("/gridnode/task", get(get_current_task))
-        .route("/health", get(health_check))
+        .route_layer(middleware::from_fn_with_state(state.clone(), auth::auth_middleware));
+
+    let app = Router::new()
+        .route("/health", get(auth::health_check))
+        .merge(protected_routes)
         .with_state(state);
 
-    // 启动服务
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    info!("IDM-GridCore Server listening on {}", addr);
+    // 解析绑定地址
+    let addr: SocketAddr = server_config.bind.parse()?;
+    info!("IDM-GridCore ComputeHub listening on {}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }
 
 // ========== 用户 API ==========
@@ -81,7 +117,7 @@ async fn create_task(
 
     let mut state = state.write().await;
     state.add_task(task);
-    
+
     info!("Task '{}' registered", name);
     Ok(StatusCode::CREATED)
 }
@@ -89,7 +125,7 @@ async fn create_task(
 /// 列出所有任务
 async fn list_tasks(State(state): State<AppState>) -> Json<TaskListResponse> {
     let state = state.read().await;
-    
+
     let mut current = None;
     let mut pending = Vec::new();
     let mut completed = Vec::new();
@@ -110,9 +146,11 @@ async fn list_tasks(State(state): State<AppState>) -> Json<TaskListResponse> {
 }
 
 /// 切换到下一个任务
-async fn next_task(State(state): State<AppState>) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+async fn next_task(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let mut state = state.write().await;
-    
+
     match state.next_task() {
         Some((prev, current)) => {
             info!("Switched from '{}' to '{}'", prev, current);
@@ -142,14 +180,16 @@ async fn register_node(
     State(state): State<AppState>,
     Json(req): Json<RegisterNodeRequest>,
 ) -> Json<RegisterNodeResponse> {
-    let node_id = req.node_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    
+    let node_id = req
+        .node_id
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
     let node = Node {
         id: node_id.clone(),
         hostname: req.hostname,
         architecture: req.architecture,
         cpu_count: req.cpu_count,
-        last_seen: Utc::now(),
+        last_seen: chrono::Utc::now(),
         status: NodeStatus::Online,
     };
 
@@ -160,14 +200,17 @@ async fn register_node(
     let current_task = state.get_current_task().map(|task| TaskConfig {
         task_name: task.name.clone(),
         image: task.image.clone(),
-        redis_url: None, // 简化：让计算端从任务配置里组合
+        redis_url: None,
         input_redis: task.input_redis.clone(),
         output_redis: task.output_redis.clone(),
         input_queue: task.input_queue.clone(),
         output_queue: task.output_queue.clone(),
     });
 
-    info!("Node '{}' registered with {} CPUs", node_id, req.cpu_count);
+    info!(
+        "Node '{}' registered with {} CPUs",
+        node_id, req.cpu_count
+    );
 
     Json(RegisterNodeResponse {
         node_id,
@@ -176,12 +219,9 @@ async fn register_node(
 }
 
 /// 节点心跳
-async fn heartbeat(
-    State(state): State<AppState>,
-    Json(req): Json<HeartbeatRequest>,
-) -> StatusCode {
+async fn heartbeat(State(state): State<AppState>, Json(req): Json<HeartbeatRequest>) -> StatusCode {
     let mut state = state.write().await;
-    
+
     if state.update_heartbeat(&req.node_id) {
         StatusCode::OK
     } else {
@@ -191,11 +231,9 @@ async fn heartbeat(
 }
 
 /// 获取当前任务（非阻塞）
-async fn get_current_task(
-    State(state): State<AppState>,
-) -> Json<Option<TaskConfig>> {
+async fn get_current_task(State(state): State<AppState>) -> Json<Option<TaskConfig>> {
     let state = state.read().await;
-    
+
     let config = state.get_current_task().map(|task| TaskConfig {
         task_name: task.name.clone(),
         image: task.image.clone(),
@@ -207,9 +245,4 @@ async fn get_current_task(
     });
 
     Json(config)
-}
-
-/// 健康检查
-async fn health_check() -> &'static str {
-    "OK"
 }

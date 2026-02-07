@@ -1,8 +1,8 @@
+use crate::config::ServerConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 /// 任务定义
@@ -101,6 +101,8 @@ pub type AppState = Arc<RwLock<AppStateInner>>;
 
 #[derive(Debug)]
 pub struct AppStateInner {
+    /// 服务器配置
+    pub config: ServerConfig,
     /// 所有注册的任务，按顺序
     pub tasks: Vec<(Task, TaskStatus)>,
     /// 当前运行任务的索引（None 表示未开始）
@@ -110,8 +112,9 @@ pub struct AppStateInner {
 }
 
 impl AppStateInner {
-    pub fn new() -> Self {
+    pub fn new(config: ServerConfig) -> Self {
         Self {
+            config,
             tasks: Vec::new(),
             current_task_index: None,
             nodes: HashMap::new(),
@@ -185,12 +188,6 @@ impl AppStateInner {
             let elapsed = now.signed_duration_since(node.last_seen).num_seconds();
             elapsed < timeout_secs
         });
-    }
-}
-
-impl Default for AppStateInner {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
