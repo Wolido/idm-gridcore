@@ -15,6 +15,7 @@ use models::{
     AppState, AppStateInner, CreateTaskRequest, HeartbeatRequest, Node, NodeStatus,
     RegisterNodeRequest, RegisterNodeResponse, Task, TaskConfig, TaskListResponse, TaskStatus,
 };
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -109,6 +110,7 @@ async fn create_task(
     let task = Task {
         name: req.name,
         image: req.image,
+        images: req.images,
         input_redis: req.input_redis,
         output_redis: req.output_redis,
         input_queue: req.input_queue,
@@ -184,6 +186,14 @@ async fn register_node(
         .node_id
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
+    // 根据架构确定平台（在移动前使用）
+    let platform = match req.architecture.as_str() {
+        "x86_64" => "linux/amd64",
+        "aarch64" => "linux/arm64",
+        "arm" => "linux/arm/v7",
+        _ => "linux/amd64", // 默认
+    };
+
     let node = Node {
         id: node_id.clone(),
         hostname: req.hostname,
@@ -191,14 +201,6 @@ async fn register_node(
         cpu_count: req.cpu_count,
         last_seen: chrono::Utc::now(),
         status: NodeStatus::Online,
-    };
-
-    // 根据架构确定平台
-    let platform = match req.architecture.as_str() {
-        "x86_64" => "linux/amd64",
-        "aarch64" => "linux/arm64",
-        "arm" => "linux/arm/v7",
-        _ => "linux/amd64", // 默认
     };
 
     let mut state = state.write().await;
@@ -249,7 +251,7 @@ async fn get_current_task(
 ) -> Json<Option<TaskConfig>> {
     let state = state.read().await;
 
-    let platform = params.get("platform").map(|s| s.as_str()).unwrap_or("linux/amd64");
+    let platform: &str = params.get("platform").map(|s| s.as_str()).unwrap_or("linux/amd64");
 
     let config = state.get_current_task().and_then(|task| {
         let image = task.get_image_for_platform(platform)?;

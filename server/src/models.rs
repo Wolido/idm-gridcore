@@ -220,7 +220,8 @@ impl AppStateInner {
 #[derive(Debug, Deserialize)]
 pub struct CreateTaskRequest {
     pub name: String,
-    pub image: String,
+    pub image: Option<String>,
+    pub images: Option<HashMap<String, String>>,
     pub input_redis: Option<String>,
     pub output_redis: Option<String>,
     pub input_queue: Option<String>,
