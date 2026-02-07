@@ -85,7 +85,7 @@ IDM-GridCore 是一个基于"众筹计算"理念的分布式并行计算框架�
 | 任务队列管理 | 维护任务列表，记录当前执行位置 |
 | 节点注册管理 | 接受 GridNode 注册，分配 node_id |
 | 心跳监控 | 维护节点在线状态，清理超时节点 |
-| 任务配置分发 | 向 Agent 返回当前任务配置 |
+| 任务配置分发 | 向 GridNode 返回当前任务配置 |
 | 人工切换接口 | 接收切换指令，更新当前任务指针 |
 
 #### 核心数据结构
@@ -148,7 +148,7 @@ Online ◄──► Offline (心跳超时 60s)
 
 **POST /gridnode/register** - 节点注册
 - 如果请求中没有 node_id，ComputeHub 生成新的 UUID
-- 如果请求中有 node_id，使用 Agent 提供的 ID（用于重启恢复）
+- 如果请求中有 node_id，使用 GridNode 提供的 ID（用于重启恢复）
 - 保存节点信息到 nodes
 - 返回 node_id 和当前任务配置
 
@@ -158,7 +158,7 @@ Online ◄──► Offline (心跳超时 60s)
 
 **GET /gridnode/task** - 获取任务配置
 - 返回当前 Running 任务的配置
-- Agent 轮询此接口检测任务变化
+- GridNode 轮询此接口检测任务变化
 
 #### 后台任务
 
@@ -356,11 +356,11 @@ while True:
    (重复多次，推送所有任务)
 
 4. 计算节点启动
-   Agent ──► ComputeHub: POST /agent/register
+   GridNode ──► ComputeHub: POST /gridnode/register
    ComputeHub: 返回 Task1 配置
    
-5. Agent 启动容器
-   Agent ──► Docker: start_container(Task1.image, env)
+5. GridNode 启动容器
+   GridNode ──► Docker: start_container(Task1.image, env)
    Docker: 容器运行
 
 6. 容器计算
@@ -376,10 +376,10 @@ while True:
    ComputeHub: Task1 Completed, Task2 Running
 
 8. 任务切换
-   Agent (轮询): GET /agent/task
+   GridNode (轮询): GET /gridnode/task
    ComputeHub: 返回 Task2 配置
-   Agent: 检测到任务变化
-   Agent: 停止 Task1 容器，启动 Task2 容器
+   GridNode: 检测到任务变化
+   GridNode: 停止 Task1 容器，启动 Task2 容器
    
 9. 循环步骤 5-8
 ```
@@ -402,7 +402,7 @@ while True:
 | 任务队列 | ComputeHub 内存 (RwLock) | 重启丢失，但任务配置可从 Redis 重建 |
 | 节点列表 | ComputeHub 内存 | 临时状态，重启后节点重新注册 |
 | 任务数据 | Redis | 持久化存储 |
-| 节点配置 | Agent 本地文件 | agent.toml，持久化 |
+| 节点配置 | GridNode 本地文件 | gridnode.toml，持久化 |
 | 容器状态 | Docker Daemon | 由 Docker 管理 |
 
 ### 为什么 ComputeHub 不持久化到数据库？
@@ -420,7 +420,7 @@ while True:
 ```
 1. tasks 列表为空
 2. nodes 列表为空
-3. Agent 心跳失败，重新注册
+3. GridNode 心跳失败，重新注册
 4. 用户重新调用 /api/tasks/next 开始任务
 ```
 
@@ -452,7 +452,7 @@ while True:
 **场景**: 容器内计算失败退出
 
 **处理**:
-- Agent 检测到容器退出
+- GridNode 检测到容器退出
 - 如果任务没变，重新启动容器（继续计算）
 - 如果任务已切换，启动新任务容器
 
@@ -514,7 +514,7 @@ while True:
 
 ### 4. 为什么 Rust？
 
-**决策**: 服务端和 Agent 都用 Rust 实现
+**决策**: 服务端和 GridNode 都用 Rust 实现
 
 **理由**:
 - **内存安全**: 避免内存泄漏，适合长期运行
@@ -537,7 +537,7 @@ while True:
 ### 水平扩展
 
 **计算节点扩展**:
-- 启动新机器，安装 Agent，自动加入
+- 启动新机器，安装 GridNode，自动加入
 - 无上限（只受限于 ComputeHub 内存和网络）
 
 **任务队列扩展**:
