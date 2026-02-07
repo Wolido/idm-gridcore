@@ -211,6 +211,61 @@ heartbeat_interval = 30
 - 使用密码认证
 - 可考虑 Redis Cluster 高可用
 
+## 多平台构建
+
+支持平台：
+- **Linux x86_64** ✅ 原生支持
+- **Linux ARM64** ✅ 交叉编译
+- **macOS ARM64 (M1/M2/M3)** ✅ 原生支持
+
+### 快速构建
+
+```bash
+# 构建所有平台
+./build.sh all
+
+# 或单独构建
+./build.sh linux-x64
+./build.sh linux-arm64
+./build.sh macos-arm64
+```
+
+### 手动交叉编译
+
+**Linux x86_64** (默认):
+```bash
+cargo build --release
+```
+
+**Linux ARM64**:
+```bash
+# 安装交叉编译器
+sudo apt-get install gcc-aarch64-linux-gnu
+
+# 添加 Rust target
+rustup target add aarch64-unknown-linux-gnu
+
+# 编译
+cargo build --release --target aarch64-unknown-linux-gnu
+```
+
+**macOS ARM64** (在 Mac 上执行):
+```bash
+rustup target add aarch64-apple-darwin
+cargo build --release --target aarch64-apple-darwin
+```
+
+### 平台注意事项
+
+**Linux**:
+- 需要 Docker Engine
+- 用户需在 `docker` 组或使用 `sudo`
+
+**macOS**:
+- 需要 Docker Desktop
+- 首次启动 Docker Desktop 后等待"Docker is running"
+- socket 路径：`~/.docker/run/docker.sock`
+
 ## 开发
 
 ```bash
