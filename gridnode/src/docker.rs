@@ -1,4 +1,3 @@
-use anyhow::Context;
 use bollard::container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions};
 use bollard::Docker;
 use bollard::models::HostConfig;
@@ -8,20 +7,35 @@ use tracing::{info, error, warn};
 /// Docker 管理器
 pub struct DockerManager {
     docker: Docker,
+    platform: String, // 如 "linux/arm64", "linux/amd64"
 }
 
 impl DockerManager {
     pub fn new() -> anyhow::Result<Self> {
+        // 检测当前架构
+        let arch = std::env::consts::ARCH;
+        let platform = match arch {
+            "x86_64" => "linux/amd64".to_string(),
+            "aarch64" => "linux/arm64".to_string(),
+            "arm" => "linux/arm/v7".to_string(),
+            _ => {
+                tracing::warn!("Unknown architecture: {}, defaulting to native", arch);
+                format!("linux/{}", arch)
+            }
+        };
+        tracing::info!("Detected platform: {} (architecture: {})", platform, arch);
+        
         // 尝试连接 Docker
-        Self::connect_docker()
+        let docker = Self::connect_docker()?;
+        Ok(Self { docker, platform })
     }
 
-    fn connect_docker() -> anyhow::Result<Self> {
+    fn connect_docker() -> anyhow::Result<Docker> {
         // 首先尝试标准连接（Linux socket 或 Windows named pipe）
         match Docker::connect_with_local_defaults() {
             Ok(docker) => {
                 info!("Connected to Docker");
-                return Ok(Self { docker });
+                return Ok(docker);
             }
             Err(e) => {
                 let err_msg = e.to_string();
@@ -41,7 +55,7 @@ impl DockerManager {
                     ) {
                         Ok(docker) => {
                             info!("Connected to Docker via unix socket");
-                            return Ok(Self { docker });
+                            return Ok(docker);
                         }
                         Err(e2) => {
                             if e2.to_string().contains("permission denied") {
@@ -69,7 +83,7 @@ impl DockerManager {
                             ) {
                                 Ok(docker) => {
                                     info!("Connected to Docker via {}", path);
-                                    return Ok(Self { docker });
+                                    return Ok(docker);
                                 }
                                 Err(_) => continue,
                             }
@@ -187,7 +201,7 @@ impl DockerManager {
 
         let options = CreateContainerOptions {
             name: container_name,
-            platform: None,
+            platform: Some(self.platform.as_str()),
         };
 
         // 创建容器
@@ -234,12 +248,13 @@ impl DockerManager {
         Err(anyhow::anyhow!("Wait stream ended unexpectedly"))
     }
 
-    /// 拉取镜像
+    /// 拉取镜像（根据当前架构）
     pub async fn pull_image(&self, image: &str) -> anyhow::Result<()> {
-        info!("Pulling image: {}", image);
+        info!("Pulling image: {} for platform: {}", image, self.platform);
         
         let options = bollard::image::CreateImageOptions {
             from_image: image,
+            platform: self.platform.as_str(),
             ..Default::default()
         };
 
