@@ -1,3 +1,4 @@
+use anyhow::Context;
 use bollard::container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions};
 use bollard::Docker;
 use bollard::models::HostConfig;
@@ -11,8 +12,21 @@ pub struct DockerManager {
 
 impl DockerManager {
     pub fn new() -> anyhow::Result<Self> {
-        let docker = Docker::connect_with_local_defaults()?;
-        Ok(Self { docker })
+        match Docker::connect_with_local_defaults() {
+            Ok(docker) => Ok(Self { docker }),
+            Err(e) => {
+                eprintln!("\n❌ Docker 连接失败！");
+                eprintln!("\n请确保 Docker 已安装并正在运行：");
+                eprintln!("  1. 安装 Docker: https://docs.docker.com/get-docker/");
+                eprintln!("  2. 启动 Docker 服务:");
+                eprintln!("     sudo systemctl start docker");
+                eprintln!("  3. 将当前用户加入 docker 组（可选，避免 sudo）:");
+                eprintln!("     sudo usermod -aG docker $USER");
+                eprintln!("     # 然后重新登录或执行: newgrp docker");
+                eprintln!("\n错误详情: {}\n", e);
+                Err(anyhow::anyhow!("Docker not available"))
+            }
+        }
     }
 
     /// 启动计算容器

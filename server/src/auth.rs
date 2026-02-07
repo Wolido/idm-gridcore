@@ -46,5 +46,6 @@ pub async fn auth_middleware(
 
 /// 健康检查不需要认证
 pub async fn health_check() -> &'static str {
+    tracing::info!("Health check requested");
     "OK"
 }
