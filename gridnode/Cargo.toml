@@ -13,7 +13,6 @@ tracing-subscriber = { workspace = true }
 reqwest = { version = "0.12", features = ["json"] }
 bollard = "0.17"
 futures = "0.3"
-config = "0.14"
 uuid = { version = "1", features = ["v4"] }
 gethostname = "0.5"
 toml = "0.8"
