@@ -69,7 +69,7 @@ server_url = "http://localhost:8080"
 # 节点认证 Token（与服务端配置匹配）
 token = "your-secret-token"
 
-# 节点唯一 ID（留空自动生成）
+# 节点唯一 ID（首次启动由 ComputeHub 分配，自动保存）
 # node_id = ""
 
 # 主机名（默认自动检测）

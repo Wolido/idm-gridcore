@@ -36,30 +36,22 @@ async fn main() -> anyhow::Result<()> {
     let mut config = AgentConfig::from_file(&config_path)?;
     info!("Loaded config from {}", CONFIG_PATH);
 
-    // 如果没有 node_id，生成一个并保存
-    let node_id = if let Some(id) = &config.node_id {
-        id.clone()
-    } else {
-        let id = uuid::Uuid::new_v4().to_string();
-        config.node_id = Some(id.clone());
-        config.save_to_file(&config_path)?;
-        info!("Generated new node_id: {}", id);
-        id
-    };
+    // 从配置文件读取 node_id（如果有的话）
+    let existing_node_id = config.node_id.clone();
 
     // 创建客户端
     let client = ComputeHubClient::new(config.server_url.clone(), config.token.clone());
 
-    // 注册节点
+    // 注册节点（不传 node_id，让 ComputeHub 分配）
     let parallelism = config.get_parallelism();
     info!(
-        "Registering node '{}' with {} CPUs (parallelism: {})",
-        node_id, parallelism, parallelism
+        "Registering node with {} CPUs (parallelism: {})",
+        parallelism, parallelism
     );
 
     let register_resp = match client
         .register(
-            Some(node_id.clone()),
+            existing_node_id.clone(),  // 首次为 None，后续为已有 ID
             config.hostname.clone(),
             config.architecture.clone(),
             parallelism,
@@ -68,6 +60,14 @@ async fn main() -> anyhow::Result<()> {
     {
         Ok(resp) => {
             info!("Registered successfully with node_id: {}", resp.node_id);
+            
+            // 如果是首次注册（配置文件没有 node_id），保存到配置文件
+            if existing_node_id.is_none() {
+                config.node_id = Some(resp.node_id.clone());
+                config.save_to_file(&config_path)?;
+                info!("Saved node_id to config file");
+            }
+            
             resp
         }
         Err(e) => {
@@ -75,6 +75,8 @@ async fn main() -> anyhow::Result<()> {
             return Err(e);
         }
     };
+
+    let node_id = register_resp.node_id;
 
     // 初始化 Docker 管理器
     let docker = match DockerManager::new() {
