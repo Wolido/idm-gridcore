@@ -20,8 +20,6 @@ services:
       --bind 0.0.0.0
       --port 6379
       --requirepass ${REDIS_PASSWORD:-changeme-strong-password}
-      --maxmemory ${REDIS_MAXMEMORY:-512mb}
-      --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
       --loglevel notice
