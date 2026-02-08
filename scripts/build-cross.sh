@@ -275,6 +275,21 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
                 echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
             else
                 echo -e "    ${RED}✗ 编译成功但找不到二进制: $SRC${NC}"
+                # 调试：显示实际目录内容
+                echo "    调试信息 - 检查目录结构:"
+                ls -la "$PROJECT_ROOT/target/$TARGET/release/" 2>/dev/null | head -10 || echo "    目录不存在"
+                
+                # 尝试查找二进制文件
+                FOUND=$(find "$PROJECT_ROOT/target" -name "$BINARY" -type f 2>/dev/null | head -1)
+                if [ -n "$FOUND" ]; then
+                    echo "    发现二进制在其他位置: $FOUND"
+                    echo "    尝试复制..."
+                    DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
+                    cp "$FOUND" "$DST"
+                    chmod +x "$DST"
+                    SIZE=$(ls -lh "$DST" | awk '{print $5}')
+                    echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
+                fi
             fi
         else
             echo -e "    ${RED}✗ 编译失败 (日志: /tmp/build-$CRATE-$PLATFORM.log)${NC}"
