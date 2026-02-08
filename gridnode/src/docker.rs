@@ -103,24 +103,29 @@ impl DockerManager {
         
         #[cfg(target_os = "linux")]
         {
-            eprintln!("\n方案 1 - 将用户加入 docker 组（推荐）：");
+            eprintln!("\n方案 1 - 将用户加入 docker 组（推荐，永久解决）：");
             eprintln!("   sudo usermod -aG docker $USER");
-            eprintln!("   newgrp docker  # 立即生效，或重新登录");
-            eprintln!("\n方案 2 - 使用 sudo 运行（临时）：");
+            eprintln!("   newgrp docker  # 立即生效（或重新登录）");
+            eprintln!("   # 验证: docker ps  应该不需要 sudo");
+            eprintln!("\n方案 2 - 使用 sudo 运行 GridNode（临时）：");
             eprintln!("   sudo ./gridnode");
+            eprintln!("\n方案 3 - 检查 Docker 服务状态：");
+            eprintln!("   sudo systemctl status docker");
+            eprintln!("   sudo systemctl start docker  # 如果未运行");
         }
         
         #[cfg(target_os = "macos")]
         {
-            eprintln!("\n方案 1 - 检查 Docker Desktop 是否运行：");
-            eprintln!("   open -a Docker");
-            eprintln!("\n方案 2 - 检查 socket 权限：");
-            eprintln!("   ls -la ~/.docker/run/docker.sock");
+            eprintln!("\n方案 1 - 使用 sudo 运行 GridNode（临时）：");
+            eprintln!("   sudo ./gridnode");
+            eprintln!("\n方案 2 - 修复 Docker socket 权限：");
+            eprintln!("   sudo chown $USER ~/.docker/run/docker.sock");
+            eprintln!("   # 或（OrbStack）:");
+            eprintln!("   sudo chown $USER ~/.orbstack/run/docker.sock");
+            eprintln!("\n方案 3 - 检查 Docker Desktop/OrbStack 是否运行：");
+            eprintln!("   open -a Docker      # Docker Desktop");
+            eprintln!("   open -a OrbStack    # OrbStack");
         }
-        
-        eprintln!("\n方案 3 - 检查 Docker 服务是否运行：");
-        eprintln!("   sudo systemctl status docker  # Linux");
-        eprintln!("   # macOS: 检查 Docker Desktop 状态栏图标");
         
         anyhow::anyhow!("Docker permission denied: {}", err_msg)
     }
