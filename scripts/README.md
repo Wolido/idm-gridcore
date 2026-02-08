@@ -1,8 +1,15 @@
 # 交叉编译指南
 
-本目录包含在 macOS 上使用 `cross` 进行交叉编译的工具。
+本目录包含使用 `cross` 或 `cargo` 进行交叉编译的工具。
+
+**适用场景**:
+- **macOS** → 编译 Linux 二进制（必须用 cross）
+- **Linux x86_64** → 编译 ARM64 二进制（用 cross）
+- **Linux x86_64** → 编译 x86_64 二进制（直接用 cargo，脚本会自动优化）
 
 ## 前置要求
+
+### macOS
 
 1. **Rust** - 已安装 `cargo`
 2. **Docker Desktop** - 必须运行（cross 使用 Docker 容器编译）
@@ -10,6 +17,18 @@
    ```bash
    cargo install cross --git https://github.com/cross-rs/cross
    ```
+
+### Linux
+
+1. **Rust** - 已安装 `cargo`
+2. **Docker** - 如果要交叉编译其他架构（如 ARM64）
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install docker.io
+   sudo usermod -aG docker $USER
+   ```
+
+**注意**: 在 Linux x86_64 上编译本机目标时，脚本会自动使用 `cargo build` 而不是 `cross`，速度更快。
 
 ## 快速开始
 
@@ -81,10 +100,25 @@ scp dist/gridnode-linux-arm64 pi@raspberrypi:/usr/local/bin/gridnode
 ## 故障排除
 
 ### Docker 未运行
+
+**macOS**:
 ```
 错误: Docker 未运行。cross 需要 Docker。
+请先启动 Docker Desktop
 ```
 **解决**: 启动 Docker Desktop
+
+**Linux**:
+```
+错误: Docker 未运行。cross 需要 Docker。
+请启动 docker 服务: sudo systemctl start docker
+```
+**解决**:
+```bash
+sudo systemctl start docker
+# 或
+sudo service docker start
+```
 
 ### 交叉编译失败
 ```bash
@@ -103,14 +137,33 @@ docker pull ghcr.io/cross-rs/x86_64-unknown-linux-gnu:latest
 chmod +x scripts/build-cross.sh
 ```
 
+## 平台特定说明
+
+### macOS
+必须使用 `cross` 编译 Linux 目标，因为 macOS 和 Linux 是不同的操作系统。
+
+### Linux x86_64
+- **编译本机目标** (`linux-x64`): 脚本自动使用 `cargo build`，速度最快
+- **编译 ARM64 目标** (`linux-arm64`): 使用 `cross`，需要 Docker
+
+示例：在 Linux x86_64 服务器上编译 ARM64 版本用于树莓派部署：
+```bash
+./scripts/build-cross.sh linux-arm64
+scp dist/gridnode-linux-arm64 pi@raspberrypi:/usr/local/bin/
+```
+
 ## 工作原理
 
-`cross` 工具使用 Docker 容器提供完整的交叉编译环境：
-
-1. 你的 MacBook 上运行 `cross build`
+### 使用 cross（跨 OS 或跨架构）
+1. 运行 `cross build`
 2. `cross` 启动对应平台的 Docker 容器
-3. 容器内有完整的工具链（gcc, libc, 等）
+3. 容器内有完整的交叉编译工具链
 4. 在容器内编译 Rust 项目
 5. 输出二进制到 `target/<platform>/release/`
 
-这种方式比本地安装交叉编译工具链更简单可靠。
+### 使用 cargo（Linux 本机）
+1. 脚本检测到 Linux x86_64 编译本机目标
+2. 直接使用 `cargo build --release`
+3. 无需 Docker，编译速度更快
+
+两种方式输出完全兼容的二进制文件。

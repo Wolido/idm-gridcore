@@ -79,19 +79,42 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 检测操作系统
+OS=$(uname -s)
+ARCH=$(uname -m)
+
 echo -e "${GREEN}IDM-GridCore 交叉编译工具${NC}"
 echo "========================================"
+echo "当前系统: $OS ($ARCH)"
+echo ""
 
-# 检查 cross 是否安装
-if ! command -v cross &> /dev/null; then
+# 在 Linux x86_64 上，如果目标是本机，直接用 cargo build
+USE_CROSS=1
+if [ "$OS" = "Linux" ] && [ "$ARCH" = "x86_64" ]; then
+    # 检查是否只需要编译本机平台
+    if [ ${#PLATFORMS[@]} -eq 1 ] && [ "${PLATFORMS[0]}" = "linux-x64" ]; then
+        echo -e "${YELLOW}检测到 Linux x86_64 编译本机目标，使用原生 cargo build（更快）${NC}"
+        USE_CROSS=0
+    fi
+fi
+
+# 检查 cross 是否安装（如果需要）
+if [ $USE_CROSS -eq 1 ] && ! command -v cross &> /dev/null; then
     echo -e "${YELLOW}cross 未安装，正在安装...${NC}"
     cargo install cross --git https://github.com/cross-rs/cross
 fi
 
-# 检查 Docker 是否运行
-if ! docker info &> /dev/null; then
+# 检查 Docker（如果使用 cross）
+if [ $USE_CROSS -eq 1 ] && ! docker info &> /dev/null; then
     echo -e "${RED}错误: Docker 未运行。cross 需要 Docker。${NC}"
-    echo "请先启动 Docker Desktop"
+    case $OS in
+        Darwin)
+            echo "请先启动 Docker Desktop"
+            ;;
+        Linux)
+            echo "请启动 docker 服务: sudo systemctl start docker"
+            ;;
+    esac
     exit 1
 fi
 
@@ -174,8 +197,15 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
         
         echo "  → 编译 $CRATE..."
         
-        # 使用 cross 编译
-        if cross build --release \
+        # 选择编译工具
+        if [ $USE_CROSS -eq 1 ]; then
+            BUILD_CMD="cross"
+        else
+            BUILD_CMD="cargo"
+        fi
+        
+        # 执行编译
+        if $BUILD_CMD build --release \
             --package "$CRATE" \
             --target "$TARGET" 2>&1 | tee /tmp/build-$CRATE-$PLATFORM.log; then
             
@@ -207,7 +237,7 @@ IDM-GridCore Build Info
 Version: $VERSION
 Commit: $COMMIT
 Build Time: $BUILD_TIME
-Build Tool: cross
+Build Tool: $(if [ $USE_CROSS -eq 1 ]; then echo "cross"; else echo "cargo"; fi)
 
 Compiled Binaries:
 EOF
