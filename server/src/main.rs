@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/tasks", post(create_task).get(list_tasks))
         .route("/api/tasks/next", post(next_task))
         .route("/api/nodes", get(list_nodes))
-        .route("/api/nodes/:node_id/stop", post(stop_node))
+        .route("/api/nodes/{node_id}/stop", post(stop_node))
         .route("/gridnode/register", post(register_node))
         .route("/gridnode/heartbeat", post(heartbeat))
         .route("/gridnode/task", get(get_current_task))
