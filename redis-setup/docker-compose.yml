@@ -12,13 +12,13 @@ services:
     
     # 如需端口映射模式（通用，支持所有平台），注释掉上面一行，取消下面注释：
     # ports:
-    #   - "6379:6379"
+    #   - "${REDIS_PORT:-6379}:${REDIS_PORT:-6379}"
     
     # ========== 启动命令 ==========
     command: >
       redis-server
       --bind 0.0.0.0
-      --port 6379
+      --port ${REDIS_PORT:-6379}
       --requirepass ${REDIS_PASSWORD:-changeme-strong-password}
       --appendonly yes
       --appendfsync everysec
