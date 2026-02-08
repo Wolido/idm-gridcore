@@ -168,8 +168,28 @@ impl AppStateInner {
     }
 
     /// 添加新任务到队列末尾
+    /// 如果是第一个任务，或当前没有运行中的任务，自动开始执行
     pub fn add_task(&mut self, task: Task) {
+        let is_first_task = self.tasks.is_empty();
+        
+        // 检查是否有任务正在运行
+        let has_running_task = self.current_task_index
+            .and_then(|idx| self.tasks.get(idx))
+            .map(|(_, status)| *status == TaskStatus::Running)
+            .unwrap_or(false);
+        
         self.tasks.push((task, TaskStatus::Pending));
+        
+        // 自动开始执行的条件：
+        // 1. 这是第一个注册的任务
+        // 2. 或者当前没有任务在运行（所有任务都已完成或从未开始）
+        if is_first_task || !has_running_task {
+            let new_index = self.tasks.len() - 1;
+            self.current_task_index = Some(new_index);
+            if let Some((_, status)) = self.tasks.get_mut(new_index) {
+                *status = TaskStatus::Running;
+            }
+        }
     }
 
     /// 切换到下一个任务（人工调用）
