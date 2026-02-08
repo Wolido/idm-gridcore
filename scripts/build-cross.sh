@@ -234,6 +234,7 @@ fi
 
 # 要编译的 crate
 CRATES=("server" "gridnode")
+CRATE_PATHS=("$PROJECT_ROOT/server/Cargo.toml" "$PROJECT_ROOT/gridnode/Cargo.toml")
 BINARY_NAMES=("computehub" "gridnode")
 
 echo "开始交叉编译..."
@@ -258,9 +259,9 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
             BUILD_CMD="cargo"
         fi
         
-        # 执行编译
+        # 执行编译（使用 --manifest-path 替代 --package，cross 兼容性更好）
         if $BUILD_CMD build --release \
-            --package "$CRATE" \
+            --manifest-path "${CRATE_PATHS[$i]}" \
             --target "$TARGET" 2>&1 | tee /tmp/build-$CRATE-$PLATFORM.log; then
             
             # 复制并重命名二进制
