@@ -11,8 +11,10 @@ pub struct GridNodeConfig {
     /// 节点唯一 ID（首次运行时生成，保存到文件）
     pub node_id: Option<String>,
     /// 并行容器数（默认使用 CPU 核心数）
+    #[serde(default)]
     pub parallelism: Option<u32>,
     /// 心跳间隔（秒）
+    #[serde(default = "default_heartbeat_interval")]
     pub heartbeat_interval: u64,
     /// 停止容器的优雅超时（秒）
     /// 任务切换时，给容器多少时间来完成当前工作
@@ -21,6 +23,10 @@ pub struct GridNodeConfig {
     /// 每个容器的内存限制（MB）
     #[serde(default = "default_container_memory")]
     pub container_memory: u64,
+}
+
+fn default_heartbeat_interval() -> u64 {
+    30 // 默认30秒
 }
 
 fn default_stop_timeout() -> u64 {
