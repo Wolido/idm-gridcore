@@ -260,40 +260,45 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
         fi
         
         # 执行编译（使用 --manifest-path 替代 --package，cross 兼容性更好）
-        if $BUILD_CMD build --release \
+        $BUILD_CMD build --release \
             --manifest-path "${CRATE_PATHS[$i]}" \
-            --target "$TARGET" 2>&1 | tee /tmp/build-$CRATE-$PLATFORM.log; then
+            --target "$TARGET" 2>&1 | tee /tmp/build-$CRATE-$PLATFORM.log
+        
+        # 检查编译是否真正成功（检查日志中是否有错误）
+        if grep -q "^error\|FAILED\|Compiling $CRATE.*error" /tmp/build-$CRATE-$PLATFORM.log 2>/dev/null; then
+            echo -e "    ${RED}✗ 编译失败 (日志: /tmp/build-$CRATE-$PLATFORM.log)${NC}"
+            continue
+        fi
+        
+        # 复制并重命名二进制
+        SRC="$PROJECT_ROOT/target/$TARGET/release/$BINARY"
+        if [ -f "$SRC" ]; then
+            DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
+            cp "$SRC" "$DST"
+            chmod +x "$DST"
             
-            # 复制并重命名二进制
-            SRC="$PROJECT_ROOT/target/$TARGET/release/$BINARY"
-            if [ -f "$SRC" ]; then
+            # 显示文件大小
+            SIZE=$(ls -lh "$DST" | awk '{print $5}')
+            echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
+        else
+            echo -e "    ${RED}✗ 编译后找不到二进制: $SRC${NC}"
+            # 调试：显示实际目录内容
+            echo "    调试信息 - 检查目录结构:"
+            ls -la "$PROJECT_ROOT/target/$TARGET/release/" 2>/dev/null | head -10 || echo "    目录不存在"
+            
+            # 尝试查找二进制文件（可能输出到其他位置）
+            FOUND=$(find "$PROJECT_ROOT/target" -name "$BINARY" -type f -newer /tmp/build-$CRATE-$PLATFORM.log 2>/dev/null | head -1)
+            if [ -n "$FOUND" ]; then
+                echo "    发现二进制在其他位置: $FOUND"
+                echo "    尝试复制..."
                 DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
-                cp "$SRC" "$DST"
+                cp "$FOUND" "$DST"
                 chmod +x "$DST"
-                
-                # 显示文件大小
                 SIZE=$(ls -lh "$DST" | awk '{print $5}')
                 echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
             else
-                echo -e "    ${RED}✗ 编译成功但找不到二进制: $SRC${NC}"
-                # 调试：显示实际目录内容
-                echo "    调试信息 - 检查目录结构:"
-                ls -la "$PROJECT_ROOT/target/$TARGET/release/" 2>/dev/null | head -10 || echo "    目录不存在"
-                
-                # 尝试查找二进制文件
-                FOUND=$(find "$PROJECT_ROOT/target" -name "$BINARY" -type f 2>/dev/null | head -1)
-                if [ -n "$FOUND" ]; then
-                    echo "    发现二进制在其他位置: $FOUND"
-                    echo "    尝试复制..."
-                    DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
-                    cp "$FOUND" "$DST"
-                    chmod +x "$DST"
-                    SIZE=$(ls -lh "$DST" | awk '{print $5}')
-                    echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
-                fi
+                echo -e "    ${YELLOW}! 编译可能成功，但未生成目标文件${NC}"
             fi
-        else
-            echo -e "    ${RED}✗ 编译失败 (日志: /tmp/build-$CRATE-$PLATFORM.log)${NC}"
         fi
     done
     
