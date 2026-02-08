@@ -349,20 +349,6 @@ cargo build --release --target aarch64-apple-darwin
 **运行 GridNode**:
 - 所有平台都需要 Docker 来启动计算容器
 
-## 开发
-
-```bash
-# 克隆仓库
-git clone <repo>
-cd idm-gridcore
-
-# 编译
-cargo build --release
-
-# 测试
-cargo test
-```
-
 ## 故障排除
 
 遇到问题？查看 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 获取常见问题的解决方案，包括：
