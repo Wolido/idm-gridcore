@@ -14,7 +14,7 @@ pub struct ComputeHubClient {
 pub struct TaskConfig {
     pub task_name: String,
     pub image: String,
-    pub redis_url: Option<String>,
+    // 注意：redis_url 已弃用，请使用 input_redis/output_redis
     pub input_redis: Option<String>,
     pub output_redis: Option<String>,
     pub input_queue: Option<String>,

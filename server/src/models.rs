@@ -53,8 +53,9 @@ pub enum TaskStatus {
     Completed,
 }
 
-/// 带状态的任务
+/// 带状态的任务（保留供未来 API 扩展使用）
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 pub struct TaskWithStatus {
     #[serde(flatten)]
     pub task: Task,

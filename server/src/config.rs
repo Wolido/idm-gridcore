@@ -32,7 +32,8 @@ impl ServerConfig {
         Ok(config)
     }
 
-    /// 保存配置到文件
+    /// 保存配置到文件（保留供未来使用）
+    #[allow(dead_code)]
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
         let content = toml::to_string_pretty(self)?;
         std::fs::write(path, content)?;

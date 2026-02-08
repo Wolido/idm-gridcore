@@ -1,3 +1,6 @@
+// 允许未使用赋值的警告（current_container_id 是误报，实际在停止分支中读取）
+#![allow(unused_assignments)]
+
 mod client;
 mod config;
 mod docker;
@@ -323,7 +326,7 @@ async fn main() -> anyhow::Result<()> {
                                     .await
                                 {
                                     Ok(container_id) => {
-                                        // 保存容器ID
+                                        // 保存容器ID（用于优雅停止时停止容器）
                                         current_container_id = Some(container_id.clone());
                                         
                                         // 标记活跃

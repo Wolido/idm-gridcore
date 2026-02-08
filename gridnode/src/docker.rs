@@ -349,7 +349,8 @@ impl DockerManager {
         }
     }
 
-    /// 清理已停止的容器
+    /// 清理已停止的容器（保留供未来使用）
+    #[allow(dead_code)]
     pub async fn cleanup_stopped(&self) -> anyhow::Result<()> {
         let containers = self.docker.list_containers(None::<bollard::container::ListContainersOptions<String>>).await?;
         
