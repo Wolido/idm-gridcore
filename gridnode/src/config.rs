@@ -10,9 +10,11 @@ pub struct GridNodeConfig {
     pub token: String,
     /// 节点唯一 ID（首次运行时生成，保存到文件）
     pub node_id: Option<String>,
-    /// 本机主机名
+    /// 本机主机名（默认自动检测）
+    #[serde(default)]
     pub hostname: String,
-    /// CPU 架构
+    /// CPU 架构（默认自动检测）
+    #[serde(default)]
     pub architecture: String,
     /// 并行容器数（默认使用 CPU 核心数）
     pub parallelism: Option<u32>,
