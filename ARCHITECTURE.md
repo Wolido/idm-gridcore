@@ -373,11 +373,13 @@ hostname = "..." # 默认自动检测
 architecture = "..." # 默认自动检测
 parallelism = 4  # 可选，默认 CPU 核心数
 heartbeat_interval = 30
-stop_timeout = 30  # 停止容器的优雅超时（秒）
+stop_timeout = 30       # 停止容器的优雅超时（秒）
+container_memory = 1024 # 每个容器的内存限制（MB）
 ```
 
 **配置项说明**:
 - `stop_timeout`: 任务切换或停止时，给容器多少秒时间优雅退出。如果容器需要完成当前循环，请设置足够长的时间。
+- `container_memory`: 每个容器的内存限制（MB）。默认 1024MB (1GB)，可根据任务需求调整（512MB 轻量型，2048-4096MB 内存密集型）。
 
 ### 3. Docker 容器
 
