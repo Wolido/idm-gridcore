@@ -302,12 +302,12 @@ docker compose up -d
 
 ```bash
 # 构建所有平台
-./build.sh all
+./scripts/build-cross.sh
 
 # 或单独构建
-./build.sh linux-x64
-./build.sh linux-arm64
-./build.sh macos-arm64
+./scripts/build-cross.sh linux-x64
+./scripts/build-cross.sh linux-arm64
+./scripts/build-cross.sh macos-arm64
 ```
 
 ### 手动交叉编译
@@ -319,14 +319,14 @@ cargo build --release
 
 **Linux ARM64**:
 ```bash
-# 安装交叉编译器
-sudo apt-get install gcc-aarch64-linux-gnu
-
 # 添加 Rust target
 rustup target add aarch64-unknown-linux-gnu
 
-# 编译
-cargo build --release --target aarch64-unknown-linux-gnu
+# 使用 cross 编译（需要 Docker）
+cross build --release --target aarch64-unknown-linux-gnu
+
+# 或直接在 Linux x86_64 上用 cargo 编译 ARM64
+# 需要安装交叉编译器: sudo apt-get install gcc-aarch64-linux-gnu
 ```
 
 **macOS ARM64** (在 Mac 上执行):
@@ -337,14 +337,17 @@ cargo build --release --target aarch64-apple-darwin
 
 ### 平台注意事项
 
-**Linux**:
-- 需要 Docker Engine
-- 用户需在 `docker` 组或使用 `sudo`
+**本机编译**（Linux x86_64 → Linux x86_64, macOS → macOS）:
+- 不需要 Docker
+- 直接运行 `cargo build --release`
 
-**macOS**:
-- 需要 Docker Desktop
-- 首次启动 Docker Desktop 后等待"Docker is running"
-- socket 路径：`~/.docker/run/docker.sock`
+**交叉编译**（macOS → Linux, Linux x86_64 → ARM64）:
+- 需要 Docker 运行 cross 容器
+- macOS: Docker Desktop 或 OrbStack
+- Linux: Docker Engine，用户需在 `docker` 组
+
+**运行 GridNode**:
+- 所有平台都需要 Docker 来启动计算容器
 
 ## 开发
 
