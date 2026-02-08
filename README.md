@@ -271,7 +271,20 @@ heartbeat_interval = 30
 - 需要能访问服务端和 Redis
 
 ### Redis 部署
-- 建议部署在公网可访问的位置
+
+项目提供现成的 Redis Docker Compose 配置：
+
+```bash
+cd redis-setup
+# 编辑 .env 设置密码
+vim .env
+docker compose up -d
+```
+
+详见 [redis-setup/README.md](redis-setup/README.md)。
+
+**生产环境建议**：
+- 部署在公网可访问的位置（计算节点需能访问）
 - 使用密码认证
 - 可考虑 Redis Cluster 高可用
 

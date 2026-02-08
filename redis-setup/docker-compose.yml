@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: idm-redis
+    
+    # ========== 网络模式 ==========
+    # Linux 服务器推荐使用 host 模式（性能最好）
+    # 注意：macOS/Windows Docker Desktop 不支持 host 模式
+    network_mode: host
+    
+    # 如需端口映射模式（通用，支持所有平台），注释掉上面一行，取消下面注释：
+    # ports:
+    #   - "6379:6379"
+    
+    # ========== 启动命令 ==========
+    command: >
+      redis-server
+      --bind 0.0.0.0
+      --port 6379
+      --requirepass ${REDIS_PASSWORD:-changeme-strong-password}
+      --maxmemory ${REDIS_MAXMEMORY:-512mb}
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --loglevel notice
+    
+    # ========== 数据持久化 ==========
+    volumes:
+      - redis-data:/data
+    
+    # ========== 时区设置 ==========
+    environment:
+      - TZ=Asia/Shanghai
+    
+    # ========== 重启策略 ==========
+    # unless-stopped: 总是重启，除非手动停止
+    restart: unless-stopped
+    
+    # ========== 资源限制（可选） ==========
+    # 如需限制资源，取消下面注释并根据实际情况调整：
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.25'
+    #       memory: 256M
+
+volumes:
+  redis-data:
+    driver: local
