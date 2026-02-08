@@ -6,7 +6,7 @@
 
 - **Host 网络模式** - Linux 服务器最佳性能（无 NAT 开销）
 - **数据持久化** - AOF 模式，每秒刷盘
-- **内存限制** - 防止 Redis 耗尽服务器内存
+- **无内存限制** - 适合大规模数据存储（确保服务器内存充足）
 - **自动重启** - 除非手动停止，否则总是自动重启
 
 ## 快速开始
@@ -65,6 +65,7 @@ GridNode 配置文件 (`/etc/idm-gridcore/gridnode.toml`)：
 # 使用本机 Redis（GridNode 和 Redis 在同一台机器）
 # 任务注册时：
 #   input_redis = "redis://:your-password@127.0.0.1:6379"
+# 如果使用非默认端口，修改 URL 中的端口号
 ```
 
 任务注册 API：
@@ -78,6 +79,7 @@ curl -X POST http://computehub:8080/api/tasks \
     "image": "my-compute-image:latest",
     "input_redis": "redis://:your-password@redis-host:6379",
     "output_redis": "redis://:your-password@redis-host:6379",
+    # 注意：如果使用非默认端口，请修改 URL 中的端口号
     "input_queue": "task:input",
     "output_queue": "task:output"
   }'
@@ -140,8 +142,8 @@ ssh -L 6379:localhost:6379 user@redis-server
 # 检查 6379 端口占用
 ss -tlnp | grep 6379
 
-# 如需修改端口，编辑 docker-compose.yml 中的 --port 参数
-# 或使用端口映射模式修改映射端口
+# 如需修改端口，编辑 .env 文件中的 REDIS_PORT
+# 例如：REDIS_PORT=6380
 ```
 
 ### 内存不足
@@ -150,7 +152,8 @@ ss -tlnp | grep 6379
 # 查看 Redis 内存使用
 docker exec -it idm-redis redis-cli -a your-password INFO memory
 
-# 调整 .env 中的 REDIS_MAXMEMORY
+# 当前配置无内存限制，如需限制可手动添加 --maxmemory 参数
+# 到 docker-compose.yml 的 command 中
 ```
 
 ### 连接失败
