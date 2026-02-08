@@ -357,6 +357,15 @@ cargo build --release
 cargo test
 ```
 
+## 故障排除
+
+遇到问题？查看 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 获取常见问题的解决方案，包括：
+
+- Docker 权限问题
+- GridNode 无法注册
+- 任务不执行
+- 跨平台编译问题
+
 ## License
 
 MIT
