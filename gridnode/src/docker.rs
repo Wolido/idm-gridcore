@@ -256,6 +256,12 @@ impl DockerManager {
     /// 返回: Ok(()) 表示镜像已准备好（拉取成功或已存在）
     ///       Err 表示拉取失败（权限错误、镜像不存在等）
     pub async fn pull_image(&self, image: &str) -> anyhow::Result<()> {
+        // 首先检查本地是否已存在该镜像
+        if self.image_exists_locally(image).await {
+            info!("Image {} already exists locally, skipping pull", image);
+            return Ok(());
+        }
+        
         info!("Pulling image: {} for platform: {}", image, self.platform);
         
         let options = bollard::image::CreateImageOptions {
@@ -297,6 +303,24 @@ impl DockerManager {
 
         info!("Image pull completed: {}", image);
         Ok(())
+    }
+    
+    /// 检查镜像是否在本地存在
+    async fn image_exists_locally(&self, image: &str) -> bool {
+        match self.docker.list_images(None::<bollard::image::ListImagesOptions<String>>).await {
+            Ok(images) => {
+                for img in images {
+                    let repo_tags: &Vec<String> = &img.repo_tags;
+                    for tag in repo_tags {
+                        if tag == image || tag.starts_with(&format!("{}:", image)) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Err(_) => false,
+        }
     }
 
     /// 停止容器
