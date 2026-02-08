@@ -11,6 +11,22 @@
 | `Dockerfile` | 构建计算容器镜像 |
 | `monitor.py` | 实时监控任务进度 |
 
+## 环境准备
+
+```bash
+# 进入测试目录
+cd test-workflow
+
+# 创建虚拟环境（使用 uv）
+uv venv
+
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 安装依赖
+uv pip install -r requirements.txt
+```
+
 ## 快速开始
 
 ### 1. 启动 Redis
