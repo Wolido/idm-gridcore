@@ -42,6 +42,11 @@ pub struct HeartbeatRequest {
     pub active_containers: u32,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct HeartbeatResponse {
+    pub stop_requested: bool,
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum NodeRuntimeStatus {
     Running,
@@ -98,12 +103,13 @@ impl ComputeHubClient {
     }
 
     /// 发送心跳
+    /// 返回: (成功, 是否请求停止)
     pub async fn heartbeat(
         &self,
         node_id: &str,
         status: NodeRuntimeStatus,
         active_containers: u32,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<(bool, bool)> {
         let url = format!("{}/gridnode/heartbeat", self.base_url);
         let req = HeartbeatRequest {
             node_id: node_id.to_string(),
@@ -119,7 +125,12 @@ impl ComputeHubClient {
             .send()
             .await?;
 
-        Ok(resp.status().is_success())
+        if resp.status().is_success() {
+            let data: HeartbeatResponse = resp.json().await?;
+            Ok((true, data.stop_requested))
+        } else {
+            Ok((false, false))
+        }
     }
 
     /// 获取当前任务

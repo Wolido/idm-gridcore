@@ -18,6 +18,14 @@ pub struct GridNodeConfig {
     pub parallelism: Option<u32>,
     /// 心跳间隔（秒）
     pub heartbeat_interval: u64,
+    /// 停止容器的优雅超时（秒）
+    /// 任务切换时，给容器多少时间来完成当前工作
+    #[serde(default = "default_stop_timeout")]
+    pub stop_timeout: u64,
+}
+
+fn default_stop_timeout() -> u64 {
+    30 // 默认30秒
 }
 
 impl Default for GridNodeConfig {
@@ -30,6 +38,7 @@ impl Default for GridNodeConfig {
             architecture: std::env::consts::ARCH.to_string(),
             parallelism: None,
             heartbeat_interval: 30,
+            stop_timeout: 30, // 默认30秒
         }
     }
 }
@@ -83,5 +92,11 @@ token = "your-secret-token"
 
 # 心跳间隔（秒）
 heartbeat_interval = 30
+
+# 停止容器的优雅超时（秒）
+# 任务切换时，GridNode 会先发送 SIGTERM 给容器
+# 如果容器在这个时间内没有退出，会发送 SIGKILL 强制终止
+# 如果你的计算容器需要处理信号并完成当前工作，请设置足够长的时间
+# stop_timeout = 30
 "#.to_string()
 }

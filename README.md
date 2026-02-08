@@ -142,6 +142,7 @@ GridNode 会自动：
 - 根据 CPU 核心数启动 N 个容器
 - 每个容器从 Redis 取任务计算
 - 定期发送心跳
+- 响应任务切换和停止命令
 
 ### 6. 人工切换任务
 
@@ -152,6 +153,34 @@ curl -X POST http://localhost:8080/api/tasks/next
 ```
 
 所有计算节点会自动切换到下一个任务。
+
+### 7. 停止计算节点
+
+**远程停止（通过 ComputeHub）**：
+
+```bash
+curl -X POST http://localhost:8080/api/nodes/{node_id}/stop \
+  -H "Authorization: Bearer your-secret-token"
+```
+
+节点收到停止请求后会：
+1. 等待当前运行的容器完成（最长 30 秒，可配置）
+2. 清理容器资源
+3. 退出进程
+
+**本地停止（直接在计算节点）**：
+
+```bash
+# 前台运行时按 Ctrl+C
+./gridnode
+# Ctrl+C
+
+# 或使用 systemctl
+sudo systemctl stop gridnode
+
+# 或发送 SIGTERM
+kill -TERM $(pgrep gridnode)
+```
 
 ## API 文档
 
@@ -170,13 +199,14 @@ Authorization: Bearer <your-token>
 | `/api/tasks` | GET | 查看任务队列 |
 | `/api/tasks/next` | POST | 切换到下一个任务 |
 | `/api/nodes` | GET | 查看在线节点 |
+| `/api/nodes/:node_id/stop` | POST | 请求节点优雅停止 |
 
 ### 计算节点 API
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/gridnode/register` | POST | 节点注册 |
-| `/gridnode/heartbeat` | POST | 心跳上报 |
+| `/gridnode/heartbeat` | POST | 心跳上报（返回 stop_requested） |
 | `/gridnode/task` | GET | 获取当前任务配置 |
 
 ## 容器环境变量
@@ -217,6 +247,11 @@ token = "your-secret-token"
 
 # 心跳间隔（秒）
 heartbeat_interval = 30
+
+# 停止容器的优雅超时（秒）
+# 任务切换或停止时，给容器多少时间来完成当前工作
+# 超过此时间会强制终止容器
+# stop_timeout = 30
 ```
 
 ## 部署建议

@@ -12,8 +12,9 @@ use axum::{
 };
 use config::{generate_default_config, ServerConfig};
 use models::{
-    AppState, AppStateInner, CreateTaskRequest, HeartbeatRequest, Node, NodeStatus,
-    RegisterNodeRequest, RegisterNodeResponse, Task, TaskConfig, TaskListResponse, TaskStatus,
+    AppState, AppStateInner, CreateTaskRequest, HeartbeatRequest, HeartbeatResponse, Node,
+    NodeStatus, RegisterNodeRequest, RegisterNodeResponse, Task, TaskConfig, TaskListResponse,
+    TaskStatus,
 };
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -79,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/tasks", post(create_task).get(list_tasks))
         .route("/api/tasks/next", post(next_task))
         .route("/api/nodes", get(list_nodes))
+        .route("/api/nodes/:node_id/stop", post(stop_node))
         .route("/gridnode/register", post(register_node))
         .route("/gridnode/heartbeat", post(heartbeat))
         .route("/gridnode/task", get(get_current_task))
@@ -203,6 +205,7 @@ async fn register_node(
         status: NodeStatus::Online,
         runtime_status: None,
         active_containers: 0,
+        stop_requested: false,
     };
 
     let mut state = state.write().await;
@@ -234,14 +237,40 @@ async fn register_node(
 }
 
 /// 节点心跳
-async fn heartbeat(State(state): State<AppState>, Json(req): Json<HeartbeatRequest>) -> StatusCode {
+async fn heartbeat(
+    State(state): State<AppState>,
+    Json(req): Json<HeartbeatRequest>,
+) -> Json<HeartbeatResponse> {
     let mut state = state.write().await;
 
-    if state.update_heartbeat(&req.node_id, req.status, req.active_containers) {
-        StatusCode::OK
+    // 先获取 stop_requested 值
+    let stop_requested = state
+        .nodes
+        .get(&req.node_id)
+        .map(|node| node.stop_requested)
+        .unwrap_or(false);
+
+    // 然后更新心跳
+    if state.nodes.contains_key(&req.node_id) {
+        state.update_heartbeat(&req.node_id, req.status, req.active_containers);
+    }
+
+    Json(HeartbeatResponse { stop_requested })
+}
+
+/// 请求节点优雅停止
+async fn stop_node(
+    State(state): State<AppState>,
+    axum::extract::Path(node_id): axum::extract::Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut state = state.write().await;
+
+    if let Some(node) = state.nodes.get_mut(&node_id) {
+        node.stop_requested = true;
+        info!("Stop requested for node {}", node_id);
+        Ok(StatusCode::OK)
     } else {
-        warn!("Heartbeat from unknown node: {}", req.node_id);
-        StatusCode::NOT_FOUND
+        Err((StatusCode::NOT_FOUND, format!("Node {} not found", node_id)))
     }
 }
 

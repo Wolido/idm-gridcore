@@ -74,6 +74,9 @@ pub struct Node {
     pub runtime_status: Option<NodeRuntimeStatus>,
     /// 活跃容器数量
     pub active_containers: u32,
+    /// 是否请求停止（管理员优雅退出指令）
+    #[serde(skip)]  // 不序列化到客户端
+    pub stop_requested: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,6 +119,12 @@ pub struct HeartbeatRequest {
     pub node_id: String,
     pub status: NodeRuntimeStatus,
     pub active_containers: u32,
+}
+
+/// 心跳响应
+#[derive(Debug, Serialize)]
+pub struct HeartbeatResponse {
+    pub stop_requested: bool,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]

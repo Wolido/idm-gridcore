@@ -7,7 +7,9 @@ use crate::config::GridNodeConfig;
 use crate::docker::DockerManager;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::{Mutex, watch};
 use tokio::time::{interval, sleep, Duration};
 use tracing::{error, info, warn};
@@ -108,6 +110,40 @@ async fn main() -> anyhow::Result<()> {
     let container_errors = Arc::new(Mutex::new(HashMap::<u32, String>::new()));
     let active_containers_for_heartbeat = active_containers.clone();
     let container_errors_for_heartbeat = container_errors.clone();
+    
+    // 停止信号（用于优雅退出）
+    let stop_requested = Arc::new(AtomicBool::new(false));
+    let stop_requested_for_heartbeat = stop_requested.clone();
+    let stop_requested_for_signal = stop_requested.clone();
+
+    // 监听系统信号（SIGINT, SIGTERM）用于本地优雅退出
+    tokio::spawn(async move {
+        let mut sigterm = match signal(SignalKind::terminate()) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("Failed to create SIGTERM handler: {}", e);
+                return;
+            }
+        };
+        let mut sigint = match signal(SignalKind::interrupt()) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("Failed to create SIGINT handler: {}", e);
+                return;
+            }
+        };
+
+        tokio::select! {
+            _ = sigterm.recv() => {
+                info!("Received SIGTERM, initiating graceful shutdown...");
+            }
+            _ = sigint.recv() => {
+                info!("Received SIGINT (Ctrl+C), initiating graceful shutdown...");
+            }
+        }
+
+        stop_requested_for_signal.store(true, Ordering::SeqCst);
+    });
 
     tokio::spawn(async move {
         let mut interval = interval(Duration::from_secs(heartbeat_interval));
@@ -129,8 +165,14 @@ async fn main() -> anyhow::Result<()> {
                 .heartbeat(&heartbeat_node_id, status, count)
                 .await
             {
-                Ok(true) => {}
-                Ok(false) => {
+                Ok((true, stop_requested_from_server)) => {
+                    if stop_requested_from_server {
+                        info!("Stop requested by ComputeHub, initiating graceful shutdown...");
+                        stop_requested_for_heartbeat.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                }
+                Ok((false, _)) => {
                     warn!("Heartbeat returned false, node may not be recognized");
                 }
                 Err(e) => {
@@ -182,6 +224,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 启动工作容器
     let mut container_handles = vec![];
+    let stop_timeout = config.stop_timeout; // 停止容器的超时时间
 
     for instance_id in 0..parallelism {
         let docker = docker.clone();
@@ -189,12 +232,31 @@ async fn main() -> anyhow::Result<()> {
         let active_containers = active_containers.clone();
         let container_errors = container_errors.clone();
         let node_id = node_id.clone();
+        let stop_requested_worker = stop_requested.clone();
 
         let handle = tokio::spawn(async move {
             let mut last_task_name: Option<String> = None;
             let mut consecutive_failures: u32 = 0;
+            let stop_timeout = stop_timeout;
+            let mut current_container_id: Option<String> = None;
 
             loop {
+                // 检查是否需要停止
+                if stop_requested_worker.load(Ordering::SeqCst) {
+                    info!("[Instance {}] Stop requested, cleaning up...", instance_id);
+                    // 如果有运行的容器，停止它
+                    if let Some(ref container_id) = current_container_id {
+                        info!("[Instance {}] Stopping container {}...", instance_id, container_id);
+                        if let Err(e) = docker.stop_container(container_id, stop_timeout).await {
+                            warn!("[Instance {}] Failed to stop container: {}", instance_id, e);
+                        }
+                        let _ = docker.remove_container(container_id).await;
+                        // 标记为已处理
+                        let _ = current_container_id.take();
+                    }
+                    break;
+                }
+                
                 // 获取当前任务
                 let task_opt = task_rx.borrow().clone();
 
@@ -258,6 +320,9 @@ async fn main() -> anyhow::Result<()> {
                                     .await
                                 {
                                     Ok(container_id) => {
+                                        // 保存容器ID
+                                        current_container_id = Some(container_id.clone());
+                                        
                                         // 标记活跃
                                         *active_containers.lock().await += 1;
                                         container_errors.lock().await.remove(&instance_id);
@@ -268,8 +333,12 @@ async fn main() -> anyhow::Result<()> {
                                             &container_id,
                                             &mut task_rx,
                                             instance_id,
+                                            stop_timeout,
                                         ).await;
 
+                                        // 清除容器ID
+                                        current_container_id = None;
+                                        
                                         // 标记不活跃
                                         *active_containers.lock().await -= 1;
 
@@ -349,9 +418,32 @@ async fn main() -> anyhow::Result<()> {
         container_handles.push(handle);
     }
 
-    // 等待所有容器（实际上不会退出）
-    for handle in container_handles {
-        let _ = handle.await;
+    // 等待停止信号或所有工作线程
+    loop {
+        if stop_requested.load(Ordering::SeqCst) {
+            info!("Waiting for all workers to stop...");
+            for handle in container_handles {
+                let _ = handle.await;
+            }
+            
+            info!("All workers stopped, cleaning up...");
+            
+            // 可选：清理所有镜像（如果需要）
+            // 注意：这会比较激进，默认不启用
+            // let _ = cleanup_all_images(&docker).await;
+            
+            info!("GridNode shutdown complete");
+            break;
+        }
+        
+        // 检查是否所有工作线程都异常退出了
+        let all_finished = container_handles.iter().all(|h| h.is_finished());
+        if all_finished {
+            error!("All workers unexpectedly finished, exiting...");
+            break;
+        }
+        
+        sleep(Duration::from_secs(1)).await;
     }
 
     Ok(())
@@ -411,6 +503,7 @@ async fn wait_container_or_task_change(
     container_id: &str,
     task_rx: &mut watch::Receiver<Option<TaskConfig>>,
     instance_id: u32,
+    stop_timeout: u64,
 ) -> i64 {
     use tokio::time::timeout;
     
@@ -427,11 +520,11 @@ async fn wait_container_or_task_change(
                 
                 if new_name != current_task_name {
                     info!(
-                        "[Instance {}] Task changed from {:?} to {:?}, stopping container",
-                        instance_id, current_task_name, new_name
+                        "[Instance {}] Task changed from {:?} to {:?}, stopping container (timeout: {}s)",
+                        instance_id, current_task_name, new_name, stop_timeout
                     );
-                    // 停止容器
-                    if let Err(e) = docker.stop_container(container_id).await {
+                    // 停止容器（使用配置的超时时间）
+                    if let Err(e) = docker.stop_container(container_id, stop_timeout).await {
                         warn!("[Instance {}] Failed to stop container: {}", instance_id, e);
                     }
                     return -2; // 任务变化标记
@@ -482,4 +575,13 @@ async fn interruptible_sleep(
             }
         }
     }
+}
+
+/// 清理所有镜像（谨慎使用）
+#[allow(dead_code)]
+async fn cleanup_all_images(_docker: &DockerManager) -> anyhow::Result<()> {
+    info!("Pruning unused images...");
+    // 注意：这里可以实现镜像清理逻辑
+    // 但默认不启用，因为可能会删除其他需要的镜像
+    Ok(())
 }

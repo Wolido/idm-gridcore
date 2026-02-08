@@ -296,13 +296,14 @@ impl DockerManager {
     }
 
     /// 停止容器
-    pub async fn stop_container(&self, container_id: &str) -> anyhow::Result<()> {
-        info!("Stopping container {}", container_id);
+    /// timeout_secs: 优雅停止超时时间（秒），超过后强制 SIGKILL
+    pub async fn stop_container(&self, container_id: &str, timeout_secs: u64) -> anyhow::Result<()> {
+        info!("Stopping container {} (timeout: {}s)", container_id, timeout_secs);
         
         use bollard::container::StopContainerOptions;
         
         let options = StopContainerOptions {
-            t: 10, // 10秒优雅停止超时
+            t: timeout_secs as i64,
         };
         
         match self.docker.stop_container(container_id, Some(options)).await {
