@@ -12,6 +12,19 @@ NC='\033[0m' # No Color
 
 # 帮助信息
 show_help() {
+    local CURRENT_OS=$(uname -s)
+    # 根据当前系统显示支持的平台
+    if [ "$CURRENT_OS" = "Darwin" ]; then
+        SUPPORTED="    linux-x64       Linux x86_64 (Intel/AMD)
+    linux-arm64     Linux ARM64 (树莓派、云服务器)
+    macos-arm64     macOS ARM64 (Apple Silicon)
+    macos-x64       macOS x86_64 (Intel Mac)"
+    else
+        SUPPORTED="    linux-x64       Linux x86_64 (Intel/AMD)
+    linux-arm64     Linux ARM64 (树莓派、云服务器)
+    (macOS 目标只能在 macOS 系统上编译)"
+    fi
+    
     cat << EOF
 IDM-GridCore 交叉编译工具
 
@@ -23,26 +36,33 @@ IDM-GridCore 交叉编译工具
     -a, --all       编译所有平台（默认）
     -c, --clean     清理之前的构建
 
-支持的平台:
-    linux-x64       Linux x86_64 (Intel/AMD)
-    linux-arm64     Linux ARM64 (树莓派、云服务器)
-    macos-arm64     macOS ARM64 (Apple Silicon)
-    macos-x64       macOS x86_64 (Intel Mac)
+支持的平台 (当前系统: $CURRENT_OS):
+$SUPPORTED
 
 示例:
-    $0                      # 编译所有平台
+    $0                      # 编译所有支持的平台
     $0 linux-x64            # 只编译 Linux x86_64
     $0 linux-x64 linux-arm64 # 编译多个平台
+
+注意:
+    macOS 目标是闭源系统，只能在 macOS 上编译
 EOF
 }
 
 # 列出支持的平台
 list_platforms() {
-    echo "支持的平台:"
+    local CURRENT_OS=$(uname -s)
+    echo "支持的平台 (当前系统: $CURRENT_OS):"
     echo "  linux-x64     Linux x86_64 (Intel/AMD 服务器)"
     echo "  linux-arm64   Linux ARM64 (树莓派、ARM 云服务器)"
-    echo "  macos-arm64   macOS ARM64 (Apple Silicon M1/M2/M3)"
-    echo "  macos-x64     macOS x86_64 (Intel Mac)"
+    if [ "$CURRENT_OS" = "Darwin" ]; then
+        echo "  macos-arm64   macOS ARM64 (Apple Silicon M1/M2/M3)"
+        echo "  macos-x64     macOS x86_64 (Intel Mac)"
+    else
+        echo ""
+        echo "注意: macOS 目标只能在 macOS 系统上编译"
+        echo "      （macOS 是闭源系统，无 Linux 工具链）"
+    fi
 }
 
 # 解析参数
@@ -143,15 +163,39 @@ echo "Commit: $COMMIT"
 echo "构建时间: $BUILD_TIME"
 echo ""
 
+# Linux 无法编译 macOS 目标（闭源系统，无公开工具链）
+if [ "$OS" = "Linux" ]; then
+    # 过滤掉 macOS 目标
+    FILTERED_PLATFORMS=()
+    for platform in "${PLATFORMS[@]}"; do
+        if [[ "$platform" == macos-* ]]; then
+            echo -e "${YELLOW}警告: Linux 无法编译 macOS 目标 '$platform'，已跳过${NC}"
+            echo "macOS 只能在 macOS 系统上编译"
+        else
+            FILTERED_PLATFORMS+=("$platform")
+        fi
+    done
+    PLATFORMS=("${FILTERED_PLATFORMS[@]}")
+fi
+
 # 定义编译目标映射
 # 格式: platform_name|target_triple
 if [ ${#PLATFORMS[@]} -eq 0 ]; then
-    # 默认编译所有平台
-    TARGETS=(
-        "linux-x64|x86_64-unknown-linux-gnu"
-        "linux-arm64|aarch64-unknown-linux-gnu"
-        "macos-arm64|aarch64-apple-darwin"
-    )
+    # 默认编译所有支持的平台
+    if [ "$OS" = "Darwin" ]; then
+        # macOS: 可以编译 Linux 和 macOS
+        TARGETS=(
+            "linux-x64|x86_64-unknown-linux-gnu"
+            "linux-arm64|aarch64-unknown-linux-gnu"
+            "macos-arm64|aarch64-apple-darwin"
+        )
+    else
+        # Linux: 只能编译 Linux
+        TARGETS=(
+            "linux-x64|x86_64-unknown-linux-gnu"
+            "linux-arm64|aarch64-unknown-linux-gnu"
+        )
+    fi
 else
     # 用户指定平台
     TARGETS=()
@@ -164,9 +208,19 @@ else
                 TARGETS+=("linux-arm64|aarch64-unknown-linux-gnu")
                 ;;
             macos-arm64)
+                if [ "$OS" = "Linux" ]; then
+                    echo -e "${RED}错误: Linux 无法编译 macOS 目标${NC}"
+                    echo "请在 macOS 系统上编译 macOS 目标"
+                    exit 1
+                fi
                 TARGETS+=("macos-arm64|aarch64-apple-darwin")
                 ;;
             macos-x64)
+                if [ "$OS" = "Linux" ]; then
+                    echo -e "${RED}错误: Linux 无法编译 macOS 目标${NC}"
+                    echo "请在 macOS 系统上编译 macOS 目标"
+                    exit 1
+                fi
                 TARGETS+=("macos-x64|x86_64-apple-darwin")
                 ;;
             *)

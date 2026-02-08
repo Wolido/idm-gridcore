@@ -71,12 +71,24 @@ dist/
 
 ## 支持的平台
 
+### macOS 主机
+
 | 平台 | 目标 | 说明 |
 |------|------|------|
 | `linux-x64` | `x86_64-unknown-linux-gnu` | Linux 服务器 (Intel/AMD) |
 | `linux-arm64` | `aarch64-unknown-linux-gnu` | 树莓派、ARM 云服务器 |
 | `macos-arm64` | `aarch64-apple-darwin` | Apple Silicon Mac |
 | `macos-x64` | `x86_64-apple-darwin` | Intel Mac |
+
+### Linux 主机
+
+| 平台 | 目标 | 说明 |
+|------|------|------|
+| `linux-x64` | `x86_64-unknown-linux-gnu` | Linux 服务器 (Intel/AMD) |
+| `linux-arm64` | `aarch64-unknown-linux-gnu` | 树莓派、ARM 云服务器 |
+| `macos-*` | - | ❌ **不支持**（macOS 闭源，无 Linux 工具链） |
+
+**重要**: macOS 是闭源系统，只能在 macOS 上编译 macOS 目标。Linux 无法交叉编译 macOS 二进制。
 
 ## 部署
 
