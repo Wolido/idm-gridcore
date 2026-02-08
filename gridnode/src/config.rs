@@ -22,10 +22,17 @@ pub struct GridNodeConfig {
     /// 任务切换时，给容器多少时间来完成当前工作
     #[serde(default = "default_stop_timeout")]
     pub stop_timeout: u64,
+    /// 每个容器的内存限制（MB）
+    #[serde(default = "default_container_memory")]
+    pub container_memory: u64,
 }
 
 fn default_stop_timeout() -> u64 {
     30 // 默认30秒
+}
+
+fn default_container_memory() -> u64 {
+    1024 // 默认1024MB (1GB)
 }
 
 impl Default for GridNodeConfig {
@@ -38,7 +45,8 @@ impl Default for GridNodeConfig {
             architecture: std::env::consts::ARCH.to_string(),
             parallelism: None,
             heartbeat_interval: 30,
-            stop_timeout: 30, // 默认30秒
+            stop_timeout: 30,      // 默认30秒
+            container_memory: 1024, // 默认1024MB (1GB)
         }
     }
 }

@@ -149,6 +149,7 @@ impl DockerManager {
     }
 
     /// 启动计算容器
+    /// memory_mb: 内存限制（MB）
     pub async fn start_container(
         &self,
         task_name: &str,
@@ -156,18 +157,19 @@ impl DockerManager {
         node_id: &str,
         instance_id: usize,
         env_vars: HashMap<String, String>,
+        memory_mb: u64,
     ) -> anyhow::Result<String> {
         let container_name = format!("idm-{}-{}-{}", task_name, node_id, instance_id);
         
         // 尝试创建容器
-        match self.try_create_container(&container_name, image, &env_vars).await {
+        match self.try_create_container(&container_name, image, &env_vars, memory_mb).await {
             Ok(container) => Ok(container),
             Err(e) => {
                 // 如果容器已存在，删除后重试
                 if e.to_string().contains("Conflict") {
                     warn!("Container {} already exists, removing and recreating", container_name);
                     let _ = self.docker.remove_container(&container_name, None).await;
-                    self.try_create_container(&container_name, image, &env_vars).await
+                    self.try_create_container(&container_name, image, &env_vars, memory_mb).await
                 } else {
                     Err(e)
                 }
@@ -180,6 +182,7 @@ impl DockerManager {
         container_name: &str,
         image: &str,
         env_vars: &HashMap<String, String>,
+        memory_mb: u64,
     ) -> anyhow::Result<String> {
         // 准备环境变量
         let env: Vec<String> = env_vars
@@ -193,7 +196,7 @@ impl DockerManager {
             host_config: Some(HostConfig {
                 // 限制资源
                 cpu_count: Some(1i64),
-                memory: Some(512i64 * 1024 * 1024), // 512MB 默认限制
+                memory: Some(memory_mb as i64 * 1024 * 1024), // MB 转 bytes
                 ..Default::default()
             }),
             ..Default::default()

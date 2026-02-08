@@ -233,11 +233,13 @@ async fn main() -> anyhow::Result<()> {
         let container_errors = container_errors.clone();
         let node_id = node_id.clone();
         let stop_requested_worker = stop_requested.clone();
+        let container_memory = config.container_memory;
 
         let handle = tokio::spawn(async move {
             let mut last_task_name: Option<String> = None;
             let mut consecutive_failures: u32 = 0;
             let stop_timeout = stop_timeout;
+            let container_memory = container_memory;
             let mut current_container_id: Option<String> = None;
 
             loop {
@@ -316,6 +318,7 @@ async fn main() -> anyhow::Result<()> {
                                         &node_id,
                                         instance_id as usize,
                                         env.clone(),
+                                        container_memory,
                                     )
                                     .await
                                 {
