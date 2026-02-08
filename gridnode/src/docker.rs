@@ -65,12 +65,13 @@ impl DockerManager {
                     }
                 }
                 
-                // macOS: 尝试 Docker Desktop socket 路径
+                // macOS: 尝试 Docker Desktop / OrbStack socket 路径
                 #[cfg(target_os = "macos")]
                 {
                     let home = std::env::var("HOME").unwrap_or_default();
                     let macos_paths = [
-                        format!("{}/.docker/run/docker.sock", home),
+                        format!("{}/.orbstack/run/docker.sock", home),  // OrbStack
+                        format!("{}/.docker/run/docker.sock", home),    // Docker Desktop
                         "/var/run/docker.sock".to_string(),
                     ];
                     
