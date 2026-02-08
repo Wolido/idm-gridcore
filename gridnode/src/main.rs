@@ -45,13 +45,14 @@ async fn main() -> anyhow::Result<()> {
     let existing_node_id = config.node_id.clone();
 
     // 根据架构确定 Docker platform
-    let platform = match config.architecture.as_str() {
+    let architecture = config.get_architecture();
+    let platform = match architecture.as_str() {
         "x86_64" => "linux/amd64",
         "aarch64" => "linux/arm64",
         "arm" => "linux/arm/v7",
         _ => "linux/amd64",
     };
-    info!("Detected platform: {}", platform);
+    info!("Detected platform: {} (architecture: {})", platform, architecture);
 
     // 创建客户端
     let client = ComputeHubClient::new(
@@ -67,11 +68,14 @@ async fn main() -> anyhow::Result<()> {
         parallelism, parallelism
     );
 
+    let hostname = config.get_hostname();
+    let architecture = config.get_architecture();
+    
     let register_resp = match client
         .register(
             existing_node_id.clone(), // 首次为 None，后续为已有 ID
-            config.hostname.clone(),
-            config.architecture.clone(),
+            hostname,
+            architecture,
             parallelism,
         )
         .await
