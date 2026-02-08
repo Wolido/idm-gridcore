@@ -229,34 +229,37 @@ Authorization: Bearer <your-token>
 
 ### GridNode 配置 (`/etc/idm-gridcore/gridnode.toml`)
 
+**必需配置**（必须手动设置）：
 ```toml
 # ComputeHub 服务端地址
 server_url = "http://192.168.1.100:8080"
 
 # 节点认证 Token（必须与 ComputeHub 配置的 token 相同）
 token = "your-secret-token"
+```
 
+**可选配置**（都有默认值，一般不需要修改）：
+```toml
 # 节点唯一 ID（首次启动由 ComputeHub 分配，自动保存）
 # node_id = "xxx-xxx-xxx"
-
-# 主机名（默认自动检测）
-# hostname = "raspberry-pi-1"
 
 # 并行容器数（默认使用 CPU 核心数）
 # parallelism = 4
 
-# 心跳间隔（秒）
-heartbeat_interval = 30
+# 心跳间隔（秒，默认 30）
+# heartbeat_interval = 30
 
-# 停止容器的优雅超时（秒）
+# 停止容器的优雅超时（秒，默认 30）
 # 任务切换或停止时，给容器多少时间来完成当前工作
-# 超过此时间会强制终止容器
 # stop_timeout = 30
 
-# 每个容器的内存限制（MB）
-# 根据计算任务需求调整：512（轻量）、1024（默认）、2048-4096（内存密集型）
+# 每个容器的内存限制（MB，默认 1024）
 # container_memory = 1024
 ```
+
+**自动检测字段**（无需配置）：
+- `hostname` - 自动获取系统主机名
+- `architecture` - 自动检测 CPU 架构 (x86_64/aarch64/arm)
 
 ## 部署建议
 
