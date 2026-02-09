@@ -224,6 +224,39 @@ impl AppStateInner {
         None
     }
 
+    /// 完成当前任务（finish API）
+    /// 标记当前任务为完成，如果有下一个则自动开始
+    /// 返回: (完成的任务名, 新开始的任务名(可能没有))
+    /// 错误: 没有当前任务在运行
+    pub fn finish_current_task(&mut self) -> Result<(String, Option<String>), &'static str> {
+        // 必须有当前任务在运行
+        let prev_idx = self.current_task_index.ok_or("No current task running")?;
+        
+        // 获取当前任务名
+        let prev_name = self.tasks.get(prev_idx)
+            .map(|(t, _)| t.name.clone())
+            .ok_or("Current task index invalid")?;
+        
+        // 标记当前任务完成
+        if let Some((_, status)) = self.tasks.get_mut(prev_idx) {
+            *status = TaskStatus::Completed;
+        }
+
+        // 尝试找到下一个 pending 任务
+        let next_idx = prev_idx + 1;
+        
+        if next_idx < self.tasks.len() {
+            self.current_task_index = Some(next_idx);
+            if let Some((task, status)) = self.tasks.get_mut(next_idx) {
+                *status = TaskStatus::Running;
+                return Ok((prev_name, Some(task.name.clone())));
+            }
+        }
+        
+        // 没有下一个任务，完成操作本身仍是成功的
+        Ok((prev_name, None))
+    }
+
     /// 注册或更新节点
     pub fn register_node(&mut self, node: Node) {
         self.nodes.insert(node.id.clone(), node);

@@ -110,7 +110,7 @@ Failed to register: HTTP 401
    ```
    如果没有 current 任务，调用：
    ```bash
-   curl -X POST -H "Authorization: Bearer your-token" http://localhost:8080/api/tasks/next
+   curl -X POST -H "Authorization: Bearer your-token" http://localhost:8080/api/tasks/finish
    ```
 
 2. **检查镜像是否存在**
@@ -185,7 +185,7 @@ curl -X POST http://localhost:8080/api/tasks \
 
 然后切换到该任务：
 ```bash
-curl -X POST -H "Authorization: Bearer your-token" http://localhost:8080/api/tasks/next
+curl -X POST -H "Authorization: Bearer your-token" http://localhost:8080/api/tasks/finish
 ```
 
 GridNode 会自动检测任务变化并继续执行。

@@ -146,12 +146,31 @@ GridNode 会自动：
 - 定期发送心跳
 - 响应任务切换和停止命令
 
-### 6. 人工切换任务
+### 6. 完成当前任务
 
-当第一个任务的 Redis 队列空了（人工确认）：
+当当前任务的 Redis 队列空了（人工确认）：
 
 ```bash
-curl -X POST http://localhost:8080/api/tasks/next
+curl -X POST http://localhost:8080/api/tasks/finish \
+  -H "Authorization: Bearer your-secret-token"
+```
+
+响应示例（有下一个任务）：
+```json
+{
+  "completed": "task-1",
+  "started": "task-2",
+  "message": "Task 'task-1' completed, 'task-2' started"
+}
+```
+
+响应示例（最后一个任务）：
+```json
+{
+  "completed": "task-1",
+  "started": null,
+  "message": "Task 'task-1' completed, no more tasks"
+}
 ```
 
 所有计算节点会自动切换到下一个任务。
@@ -199,7 +218,8 @@ Authorization: Bearer <your-token>
 |------|------|------|
 | `/api/tasks` | POST | 注册新任务 |
 | `/api/tasks` | GET | 查看任务队列 |
-| `/api/tasks/next` | POST | 切换到下一个任务 |
+| `/api/tasks/next` | POST | 切换到下一个任务（旧，建议使用 finish） |
+| `/api/tasks/finish` | POST | 完成当前任务，自动开始下一个 |
 | `/api/nodes` | GET | 查看在线节点 |
 | `/api/nodes/:node_id/stop` | POST | 请求节点优雅停止 |
 

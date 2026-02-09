@@ -182,7 +182,7 @@ Node {
 任务状态机:
 Pending ──► Running ──► Completed
   ▲           │
-  └───────────┘ (人工调用 next_task)
+  └───────────┘ (人工调用 finish_current_task)
 ```
 
 ```
@@ -202,11 +202,14 @@ Idle ──► Running ──► Error (容器失败)
 - 状态设为 Pending
 - 如果这是第一个任务，不会自动开始（需调用 next）
 
-**POST /api/tasks/next** - 切换到下一个任务
+**POST /api/tasks/finish** - 完成当前任务
 - 将当前任务标记为 Completed
-- 找到下一个 Pending 任务，标记为 Running
-- 更新 current_task_index
-- 返回切换结果
+- 如果有下一个 Pending 任务，标记为 Running，更新 current_task_index
+- 如果没有下一个任务，current_task_index 保持不变（指向已完成的任务）
+- 返回 (完成的任务名, 新开始的任务名/None)
+
+**POST /api/tasks/next** - 切换到下一个任务（旧接口，建议用 finish）
+- 与 finish 逻辑相同，但当没有下一个任务时返回错误
 
 **POST /gridnode/register** - 节点注册
 - 如果请求中没有 node_id，ComputeHub 生成新的 UUID
@@ -465,7 +468,7 @@ while True:
    ComputeHub: 保存任务到 tasks (Pending)
 
 2. 用户启动任务
-   User ──► ComputeHub: POST /api/tasks/next
+   User ──► ComputeHub: POST /api/tasks/finish
    ComputeHub: 标记 Task1 为 Running
 
 3. 用户推送任务数据
@@ -489,7 +492,7 @@ while True:
 
 7. 人工确认完成
    User: 检查 Redis task1:input 为空
-   User ──► ComputeHub: POST /api/tasks/next
+   User ──► ComputeHub: POST /api/tasks/finish
    ComputeHub: Task1 Completed, Task2 Running
 
 8. 任务切换
@@ -556,7 +559,7 @@ while True:
 1. tasks 列表为空
 2. nodes 列表为空
 3. GridNode 心跳失败，重新注册
-4. 用户重新调用 /api/tasks/next 开始任务
+4. 用户重新调用 /api/tasks/finish 开始任务（或重新注册任务）
 ```
 
 **GridNode 重启**:
@@ -623,7 +626,7 @@ while True:
 
 **恢复**:
 - 服务重启后，节点自动重新连接
-- 用户调用 /api/tasks/next 恢复任务
+- 用户调用 /api/tasks/finish 恢复任务
 
 ### 4. Redis 故障
 
@@ -658,14 +661,19 @@ while True:
 
 ## 关键设计决策
 
-### 1. 为什么人工切换任务？
+### 1. 为什么人工完成任务？
 
-**决策**: 不由系统自动判断任务完成，而由人工调用 /api/tasks/next
+**决策**: 不由系统自动判断任务完成，而由人工调用 /api/tasks/finish
 
 **理由**:
 - **简化**: 不需要复杂的完成检测逻辑
 - **灵活**: 用户可以根据业务逻辑判断完成（如检查输出队列长度、结果质量等）
 - **可控**: 避免误切换（如队列暂时为空但还有任务在传输中）
+
+**为什么是 finish 而不是 next**:
+- finish 的语义是"完成当前任务"，next 的语义是"切换到下一个"
+- finish 可以正确处理最后一个任务（无下一个时也返回成功）
+- next 暗示必须有下一个，导致最后一个任务处理时语义不清
 
 ### 2. 为什么每个容器单 CPU？
 

@@ -79,6 +79,7 @@ async fn main() -> anyhow::Result<()> {
     let protected_routes = Router::new()
         .route("/api/tasks", post(create_task).get(list_tasks))
         .route("/api/tasks/next", post(next_task))
+        .route("/api/tasks/finish", post(finish_task))
         .route("/api/nodes", get(list_nodes))
         .route("/api/nodes/{node_id}/stop", post(stop_node))
         .route("/gridnode/register", post(register_node))
@@ -166,6 +167,37 @@ async fn next_task(
         None => Err((
             StatusCode::BAD_REQUEST,
             "No more tasks available".to_string(),
+        )),
+    }
+}
+
+/// 完成当前任务（finish API）
+async fn finish_task(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let mut state = state.write().await;
+
+    match state.finish_current_task() {
+        Ok((completed, started)) => {
+            if let Some(new_task) = &started {
+                info!("Finished '{}', started '{}'", completed, new_task);
+                Ok(Json(serde_json::json!({
+                    "completed": completed,
+                    "started": new_task,
+                    "message": format!("Task '{}' completed, '{}' started", completed, new_task),
+                })))
+            } else {
+                info!("Finished '{}', no more tasks", completed);
+                Ok(Json(serde_json::json!({
+                    "completed": completed,
+                    "started": null,
+                    "message": format!("Task '{}' completed, no more tasks", completed),
+                })))
+            }
+        }
+        Err(e) => Err((
+            StatusCode::BAD_REQUEST,
+            e.to_string(),
         )),
     }
 }
