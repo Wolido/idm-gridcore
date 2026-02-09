@@ -270,16 +270,16 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
             continue
         fi
         
-        # 复制并重命名二进制
+        # 复制并重命名二进制（包含版本号）
         SRC="$PROJECT_ROOT/target/$TARGET/release/$BINARY"
         if [ -f "$SRC" ]; then
-            DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
+            DST="$OUTPUT_DIR/${BINARY}-${VERSION}-${PLATFORM}"
             cp "$SRC" "$DST"
             chmod +x "$DST"
             
             # 显示文件大小
             SIZE=$(ls -lh "$DST" | awk '{print $5}')
-            echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
+            echo -e "    ${GREEN}✓${NC} ${BINARY}-${VERSION}-${PLATFORM} (${SIZE})"
         else
             echo -e "    ${RED}✗ 编译后找不到二进制: $SRC${NC}"
             # 调试：显示实际目录内容
@@ -291,11 +291,11 @@ for TARGET_SPEC in "${TARGETS[@]}"; do
             if [ -n "$FOUND" ]; then
                 echo "    发现二进制在其他位置: $FOUND"
                 echo "    尝试复制..."
-                DST="$OUTPUT_DIR/${BINARY}-${PLATFORM}"
+                DST="$OUTPUT_DIR/${BINARY}-${VERSION}-${PLATFORM}"
                 cp "$FOUND" "$DST"
                 chmod +x "$DST"
                 SIZE=$(ls -lh "$DST" | awk '{print $5}')
-                echo -e "    ${GREEN}✓${NC} ${BINARY}-${PLATFORM} (${SIZE})"
+                echo -e "    ${GREEN}✓${NC} ${BINARY}-${VERSION}-${PLATFORM} (${SIZE})"
             else
                 echo -e "    ${YELLOW}! 编译可能成功，但未生成目标文件${NC}"
             fi
@@ -320,7 +320,53 @@ EOF
 ls -1 "$OUTPUT_DIR" | grep -v VERSION.txt >> "$OUTPUT_DIR/VERSION.txt"
 
 echo ""
+echo "打包发布文件..."
+echo ""
+
+# 为每个平台打包
+PACKAGED=()
+for TARGET_SPEC in "${TARGETS[@]}"; do
+    IFS='|' read -r PLATFORM TARGET <<< "$TARGET_SPEC"
+    
+    # 检查该平台的二进制是否存在
+    HAS_FILES=0
+    for BINARY in "${BINARY_NAMES[@]}"; do
+        if [ -f "$OUTPUT_DIR/${BINARY}-${VERSION}-${PLATFORM}" ]; then
+            HAS_FILES=1
+            break
+        fi
+    done
+    
+    if [ $HAS_FILES -eq 1 ]; then
+        PACKAGE_NAME="idm-gridcore-${VERSION}-${PLATFORM}"
+        PACKAGE_DIR="$OUTPUT_DIR/$PACKAGE_NAME"
+        mkdir -p "$PACKAGE_DIR"
+        
+        # 复制二进制到临时目录（去掉版本号，使用标准名称）
+        for BINARY in "${BINARY_NAMES[@]}"; do
+            SRC="$OUTPUT_DIR/${BINARY}-${VERSION}-${PLATFORM}"
+            if [ -f "$SRC" ]; then
+                cp "$SRC" "$PACKAGE_DIR/$BINARY"
+                chmod +x "$PACKAGE_DIR/$BINARY"
+            fi
+        done
+        
+        # 创建 tar.gz
+        tar -czf "$OUTPUT_DIR/${PACKAGE_NAME}.tar.gz" -C "$OUTPUT_DIR" "$PACKAGE_NAME"
+        rm -rf "$PACKAGE_DIR"
+        
+        SIZE=$(ls -lh "$OUTPUT_DIR/${PACKAGE_NAME}.tar.gz" | awk '{print $5}')
+        echo -e "${GREEN}✓${NC} ${PACKAGE_NAME}.tar.gz (${SIZE})"
+        PACKAGED+=("$PACKAGE_NAME.tar.gz")
+    fi
+done
+
+echo ""
 echo -e "${GREEN}编译完成！${NC}"
 echo "输出目录: $OUTPUT_DIR"
 echo ""
-ls -lh "$OUTPUT_DIR"
+echo "二进制文件:"
+ls -lh "$OUTPUT_DIR" | grep -v "\.tar\.gz" | grep -v "VERSION.txt" | tail -n +2
+echo ""
+echo "发布包:"
+ls -lh "$OUTPUT_DIR"/*.tar.gz 2>/dev/null || echo "  (无)"
