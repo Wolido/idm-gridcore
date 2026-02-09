@@ -1,3 +1,5 @@
+<img src="https://disc-wolido.oss-cn-beijing.aliyuncs.com/idm-logo/%E6%B5%85%E8%89%B2%E8%83%8C%E6%99%AFlogo-%E5%B7%A6%E5%8F%B3.png" style="height: 60px" />
+
 # IDM-GridCore
 
 [![Built with 小顺子](https://img.shields.io/badge/Built%20with-%E5%B0%8F%E9%A1%BA%E5%AD%90-3b82f6?style=flat-square&logo=robotframework&logoColor=white)](.)
