@@ -59,7 +59,7 @@ docker exec -it idm-redis redis-cli -a your-password
 
 ## IDM-GridCore 连接配置
 
-GridNode 配置文件 (`/etc/idm-gridcore/gridnode.toml`)：
+GridNode 配置文件（系统默认用户配置目录）：
 
 ```toml
 # 使用本机 Redis（GridNode 和 Redis 在同一台机器）

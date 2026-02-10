@@ -24,29 +24,72 @@ use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
 use tracing::{info, warn};
 
-const CONFIG_PATH: &str = "/etc/idm-gridcore/computehub.toml";
-const CONFIG_DIR: &str = "/etc/idm-gridcore";
+const CONFIG_FILENAME: &str = "computehub.toml";
+const CONFIG_DIR_NAME: &str = "idm-gridcore";
+
+/// 获取配置文件路径（按优先级）
+/// 1. 环境变量 IDM_GRIDCORE_CONFIG
+/// 2. /etc/idm-gridcore/computehub.toml（如果存在）
+/// 3. ~/.config/idm-gridcore/computehub.toml
+fn get_config_path() -> PathBuf {
+    // 优先级1：环境变量
+    if let Ok(env_path) = std::env::var("IDM_GRIDCORE_CONFIG") {
+        return PathBuf::from(env_path);
+    }
+    
+    // 优先级2：/etc 路径（如果存在）
+    let etc_path = PathBuf::from("/etc").join(CONFIG_DIR_NAME).join(CONFIG_FILENAME);
+    if etc_path.exists() {
+        return etc_path;
+    }
+    
+    // 优先级3：用户配置目录
+    let home_config = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(CONFIG_DIR_NAME)
+        .join(CONFIG_FILENAME);
+    
+    home_config
+}
+
+/// 获取配置目录路径（用于创建默认配置）
+fn get_config_dir() -> PathBuf {
+    // 如果 /etc 路径存在配置，优先使用
+    let etc_dir = PathBuf::from("/etc").join(CONFIG_DIR_NAME);
+    let etc_config = etc_dir.join(CONFIG_FILENAME);
+    if etc_config.exists() {
+        return etc_dir;
+    }
+    
+    // 否则使用用户配置目录
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(CONFIG_DIR_NAME)
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 初始化日志
     tracing_subscriber::fmt::init();
 
+    // 获取配置路径
+    let config_path = get_config_path();
+    let config_dir = get_config_dir();
+    
     // 检查配置文件
-    let config_path = PathBuf::from(CONFIG_PATH);
     if !config_path.exists() {
         // 创建默认配置文件
-        std::fs::create_dir_all(CONFIG_DIR)?;
+        std::fs::create_dir_all(&config_dir)?;
         let default_config = generate_default_config();
         std::fs::write(&config_path, default_config)?;
-        info!("Created default config at {}", CONFIG_PATH);
+        info!("Created default config at {}", config_path.display());
         info!("Please edit the config file and set a secure token, then restart");
         return Ok(());
     }
 
     // 加载配置
     let server_config = ServerConfig::from_file(&config_path)?;
-    info!("Loaded config from {}", CONFIG_PATH);
+    info!("Loaded config from {}", config_path.display());
     info!("Bind address: {}", server_config.bind);
 
     // 检查默认 token

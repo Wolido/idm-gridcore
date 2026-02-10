@@ -80,9 +80,8 @@ Failed to register: HTTP 401
 ### 原因与解决
 
 1. **Token 不匹配**
-   - 检查 `/etc/idm-gridcore/computehub.toml` 中的 `token`
-   - 检查 `/etc/idm-gridcore/gridnode.toml` 中的 `token`
-   - 两者必须完全一致
+   - 检查 ComputeHub 和 GridNode 配置文件中的 `token` 必须完全一致
+   - 配置文件位置见 README
 
 2. **无法连接到 ComputeHub**
    ```bash
@@ -90,7 +89,8 @@ Failed to register: HTTP 401
    curl http://<computehub-ip>:8080/health
    
    # 检查 GridNode 配置中的 server_url
-   cat /etc/idm-gridcore/gridnode.toml
+   # macOS: cat ~/Library/Application\ Support/idm-gridcore/gridnode.toml
+   # Linux: cat ~/.config/idm-gridcore/gridnode.toml
    ```
 
 3. **防火墙阻止**

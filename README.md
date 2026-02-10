@@ -72,24 +72,32 @@ cd gridnode
 cargo build --release
 
 # 首次运行生成配置文件
-sudo mkdir -p /etc/idm-gridcore
-sudo ./target/release/gridnode
-# 编辑 /etc/idm-gridcore/gridnode.toml 配置服务端地址和 token
+./target/release/gridnode
+# 编辑配置文件（见下方路径）配置服务端地址和 token
 ```
+
+**配置文件默认路径**：
+- **macOS**: `~/Library/Application Support/idm-gridcore/gridnode.toml`
+- **Linux**: `~/.config/idm-gridcore/gridnode.toml`
+
+**配置文件路径优先级**：
+1. 环境变量 `IDM_GRIDCORE_CONFIG` 指定的路径
+2. `/etc/idm-gridcore/gridnode.toml`（如果存在）
+3. 系统默认用户配置目录（如上）
 
 ### 3. 配置认证 Token
 
 ComputeHub 和 GridNode 必须使用相同的 token 进行认证。
 
-**ComputeHub** (`/etc/idm-gridcore/computehub.toml`):
+配置文件路径：
+- **macOS**: `~/Library/Application Support/idm-gridcore/*.toml`
+- **Linux**: `~/.config/idm-gridcore/*.toml`
+
 ```toml
 token = "your-secret-token"
 ```
 
-**GridNode** (`/etc/idm-gridcore/gridnode.toml`):
-```toml
-token = "your-secret-token"
-```
+注意：也可以使用 `/etc/idm-gridcore/` 路径（需要 root 权限），或设置环境变量 `IDM_GRIDCORE_CONFIG` 指定任意路径。
 
 ### 4. 注册计算任务
 
@@ -136,8 +144,10 @@ curl -X POST http://localhost:8080/api/tasks \
 ### 5. 启动计算节点
 
 ```bash
-sudo ./target/release/gridnode
+./target/release/gridnode
 ```
+
+注意：如果配置在 `/etc/idm-gridcore/` 下，则需要 `sudo` 权限。
 
 GridNode 会自动：
 - 向 ComputeHub 注册
@@ -249,7 +259,10 @@ Authorization: Bearer <your-token>
 
 ## 配置文件
 
-### GridNode 配置 (`/etc/idm-gridcore/gridnode.toml`)
+### GridNode 配置
+
+- **macOS**: `~/Library/Application Support/idm-gridcore/gridnode.toml`
+- **Linux**: `~/.config/idm-gridcore/gridnode.toml`
 
 **必需配置**（必须手动设置）：
 ```toml

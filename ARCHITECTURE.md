@@ -259,7 +259,7 @@ loop {
 启动
   │
   ▼
-读取配置文件 (/etc/idm-gridcore/gridnode.toml)
+读取配置文件（系统默认用户配置目录）
   │
   ▼
 注册到 ComputeHub
@@ -366,7 +366,7 @@ loop {
 
 #### 配置管理
 
-配置文件: `/etc/idm-gridcore/gridnode.toml`
+配置文件: 系统默认用户配置目录下的 `idm-gridcore/gridnode.toml`（或 `/etc/idm-gridcore/gridnode.toml`）
 
 ```toml
 server_url = "http://192.168.1.100:8080"
