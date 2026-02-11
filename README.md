@@ -6,6 +6,18 @@
 
 **众筹式分布式并行计算框架** - 让成百上千的计算节点像众筹一样共同参与任务，轻松实现万亿级数据并行计算。
 
+---
+
+## 🚀 AI Agent Skill Available!
+
+**Use this distributed computing framework effortlessly with AI agents:**
+
+👉 **[agent-idm-gridcore](https://github.com/Wolido/agent-idm-gridcore)** 👈
+
+*Just tell your AI agent what you need - it will handle deployment, task distribution, and result collection automatically!*
+
+---
+
 ## 项目概述
 
 IDM-GridCore 是一个专为大规模并行计算设计的轻量级调度框架。它解决了传统分布式计算中节点管理复杂、扩容困难的问题，采用"众筹计算"理念：任何设备（服务器、笔记本、树莓派）都可以匿名加入计算网络，按队列顺序批量执行任务。
