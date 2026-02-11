@@ -29,39 +29,40 @@ const CONFIG_DIR_NAME: &str = "idm-gridcore";
 
 /// 获取配置文件路径（按优先级）
 /// 1. 环境变量 IDM_GRIDCORE_CONFIG
-/// 2. /etc/idm-gridcore/computehub.toml（如果存在）
-/// 3. ~/.config/idm-gridcore/computehub.toml
+/// 2. 用户配置目录（无需 sudo）
+///    - macOS: ~/Library/Application Support/idm-gridcore/computehub.toml
+///    - Linux: ~/.config/idm-gridcore/computehub.toml
+/// 3. /etc/idm-gridcore/computehub.toml（需要 sudo，仅降级兼容）
 fn get_config_path() -> PathBuf {
     // 优先级1：环境变量
     if let Ok(env_path) = std::env::var("IDM_GRIDCORE_CONFIG") {
         return PathBuf::from(env_path);
     }
     
-    // 优先级2：/etc 路径（如果存在）
+    // 优先级2：用户配置目录（默认，无需 sudo）
+    let user_config = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(CONFIG_DIR_NAME)
+        .join(CONFIG_FILENAME);
+    if user_config.exists() {
+        return user_config;
+    }
+    
+    // 优先级3：/etc 路径（降级兼容，仅当用户目录不存在时）
     let etc_path = PathBuf::from("/etc").join(CONFIG_DIR_NAME).join(CONFIG_FILENAME);
     if etc_path.exists() {
         return etc_path;
     }
     
-    // 优先级3：用户配置目录
-    let home_config = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(CONFIG_DIR_NAME)
-        .join(CONFIG_FILENAME);
-    
-    home_config
+    // 默认返回用户目录（用于创建新配置，无需 sudo）
+    user_config
 }
 
 /// 获取配置目录路径（用于创建默认配置）
+/// 始终使用用户配置目录，无需 sudo
+/// - macOS: ~/Library/Application Support/idm-gridcore/
+/// - Linux: ~/.config/idm-gridcore/
 fn get_config_dir() -> PathBuf {
-    // 如果 /etc 路径存在配置，优先使用
-    let etc_dir = PathBuf::from("/etc").join(CONFIG_DIR_NAME);
-    let etc_config = etc_dir.join(CONFIG_FILENAME);
-    if etc_config.exists() {
-        return etc_dir;
-    }
-    
-    // 否则使用用户配置目录
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(CONFIG_DIR_NAME)

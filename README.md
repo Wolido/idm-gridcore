@@ -59,11 +59,37 @@ IDM-GridCore 是一个专为大规模并行计算设计的轻量级调度框架�
 
 ### 1. 启动 ComputeHub 服务端
 
+**配置文件路径说明**：
+- **macOS**: `~/Library/Application Support/idm-gridcore/computehub.toml`
+- **Linux**: `~/.config/idm-gridcore/computehub.toml`
+
+**配置文件路径优先级**：
+1. 环境变量 `IDM_GRIDCORE_CONFIG` 指定的路径
+2. 用户配置目录（无需 sudo）
+3. `/etc/idm-gridcore/computehub.toml`（需要 sudo，不推荐）
+
+**方式一：使用环境变量指定配置路径（推荐）**
+
 ```bash
-cd computehub
+# macOS
+export IDM_GRIDCORE_CONFIG="$HOME/Library/Application Support/idm-gridcore/computehub.toml"
+
+# Linux
+export IDM_GRIDCORE_CONFIG="$HOME/.config/idm-gridcore/computehub.toml"
+
+cd server
 cargo run --release
-# 默认监听 0.0.0.0:8080
 ```
+
+**方式二：直接运行（自动创建配置到用户目录）**
+
+```bash
+cd server
+cargo run --release
+# 首次运行会自动在用户目录创建默认配置，编辑设置 token 后重新运行即可
+```
+
+默认监听 `0.0.0.0:8080`
 
 ### 2. 在计算节点安装 GridNode
 
@@ -82,8 +108,8 @@ cargo build --release
 
 **配置文件路径优先级**：
 1. 环境变量 `IDM_GRIDCORE_CONFIG` 指定的路径
-2. `/etc/idm-gridcore/gridnode.toml`（如果存在）
-3. 系统默认用户配置目录（如上）
+2. 用户配置目录（无需 sudo）
+3. `/etc/idm-gridcore/gridnode.toml`（需要 sudo，不推荐）
 
 ### 3. 配置认证 Token
 
